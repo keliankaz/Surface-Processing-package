@@ -1,6 +1,6 @@
 function newZGrid = align_grid(zGrid, ptSpacing)
 
-rotAngle                = fuckthisshit(zGrid,10000,5);
+rotAngle                = fuckthisshit(zGrid,10000,10);
 newZGrid                = rotateZ(zGrid,rotAngle,ptSpacing);
 end
 
@@ -13,15 +13,18 @@ function [angle] = fuckthisshit(zGrid, downSampleSize, numScale)
 downSampFactor = ceil(sqrt(numel(zGrid)/downSampleSize));
 
 % downsample 
-
-downSampGrid = downsample((downsample(zGrid, downSampFactor))', ...
+if downSampFactor >= 1;
+    downSampGrid = downsample((downsample(zGrid, downSampFactor))', ...
                           downSampFactor)';
+else
+    downSampGrid = zGrid;
+end
 
 % remove entire rows of nan
 [~, M] = size(downSampGrid);
 downSampGrid = downSampGrid(sum(isnan(downSampGrid),2)~= M, :);
 
-% define the frequency vector that will be samples on the rotated grids
+% define the frequency vector that will be sampled on the rotated grids
 [yLength,xLength] = size(downSampGrid);
 fVec = logspace(log10(10/(xLength)),log10(1/(2)),numScale);
 
@@ -61,10 +64,8 @@ for iAng = 1:maxRotation
     roughness(iAng) = sum(nanmean(log(PXX)));
  
 end
-    
-plot(roughness,1:180)
 
 % min the amplitude to the peridogram
-angle = find(roughness == min(roughness))*pi/180
+angle = find(roughness == min(roughness))*pi/180;
 
 end

@@ -1,4 +1,4 @@
-function [surface, zGrid, ptSpacing ] = surface_preprocessing_2(fileName, unit)
+function [surface, zGrid, ptSpacing ] = surface_preprocessing_2(fileName, unit, instrument)
 %surface_preprocessing: takes raw data and converts it into workable
 %aligned and gridded output according to desired point (spacing in meters)
 
@@ -22,15 +22,19 @@ end
 
 %% remove patches of saturation (for white light) - wont really matter otherwise
 
+if strcmp(instrument,'white light')
 % saturated points have a fixed value
 
 saturation      = xyzDATA(:,3) == max(xyzDATA(:,3));
 xyzDATA         = xyzDATA(~saturation,:); 
 
+end
+
  %% flatten data (detrend)
 
  % remove clear height field oultliers which may latter affect the quality
  % of the fit:
+ 
  goodData       = xyzDATA(:,3)<(mean(xyzDATA(:,3))+7*std(xyzDATA(:,3)))| ...
                   xyzDATA(:,3)>(mean(xyzDATA(:,3))-7*std(xyzDATA(:,3)));
  xyzDATA        = xyzDATA(goodData,:);
@@ -67,7 +71,6 @@ surface         = griddata(X,Y,Z,xGrid,yGrid);
 % (must come before cleaning because of interpolation steps):
 
 zGrid           = align_grid(surface, ptSpacing);
-imagesc(zGrid)
 
 %% Clean surface
 zGrid           = surface_cleaning(zGrid,'default');

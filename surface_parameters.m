@@ -41,7 +41,12 @@ h               = pointSpacing; % point spacing in m
 
 scale0      = 4;                    % smallest scale (cant be less than 3)
 maxScale    = numx;                 % largest scale, numx is num columns
-numScale    = numberOfScales;       % number of scale increments to include
+
+if strcmp(numberOfScales, default)
+    numScale = 10;
+else
+    numScale    = numberOfScales;       % number of scale increments to include
+end 
 
 % defining the vector with all the scales of interest
 scaleDef    = ceil(logspace(log10(scale0),log10(maxScale),numScale)); 

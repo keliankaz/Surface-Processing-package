@@ -1,15 +1,24 @@
-function  parameterStruct = surface_analysis(surfaceGrid, pointSpacing)
+function  parameterStruct = surface_analysis(surfaceGrid, pointSpacing, ...
+                                             numberOfScales, decimationFactor)
 
 % the grunt of the analysis is done here...
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % run surface parameter analysis (std, skew, kurt and asymetry) - set at
 % 10 sampled scales
 
-parameterStruct     = surface_parameters(surfaceGrid, pointSpacing, 10);
+parameterStruct     = surface_parameters(surfaceGrid, pointSpacing, ...
+                                         numberOfScales);
 
-% run surface fft analysis (with decimation factor = 20)
+% run surface fft analysis (with default decimation factor = 20)
 
-[fx1, PowerStructx] =  frequency_spectrum(surfaceGrid, pointSpacing,20);
+if strcmp(decimationFactor,'default')
+    decimationFactor = 1;
+end
+
+[fx1, PowerStructx] =  frequency_spectrum(surfaceGrid, pointSpacing, ...
+                                          decimationFactor);
 
 % process output - concatonate the structure array  (I think)
 [Nx,Ny]             = size(PowerStructx);

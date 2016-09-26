@@ -12,6 +12,7 @@ function [ ] = surfaceprocessing(unit,varargin)
 
 % output: files will be saved 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % running surface asymmetry function and saving files
 
 disp('Choose the input directory')
@@ -26,34 +27,60 @@ disp('Nice!')
 
 destination_directory = uigetdir;
 
-application = varargin{1};
+%% dealing with user inputs
+
+if nargin >=1
+    instrument = varargin{1};
+else
+    instrument = 'default';
+end
+
+if nargin >=2
+    numberOfScales = varargin{2};
+else
+    numberOfScales = 'default'; % default is ten scales
+end 
+
+if nargin >=3
+    decimationFactor = varargin{3};
+else
+    decimationFactor = 'default';
+end
+
+%% process data:
 
 parfor iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name;
-    parfor_process(fileName,unit,destination_directory);
-
+    parfor_process(fileName,unit,destination_directory,instrument,...
+                   numberOfScales, decimationFactor);
+    
 end
 
+%%
 disp('Alright we are done here!')
 end
 
-function [] = parfor_process(fileName,unit,destination_directory)
+function [] = parfor_process(fileName,unit,destination_directory, ...
+                             instrument,numberOfScales,decimationFactor)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
 
     [surface, zGrid, pointSpacing] = ...
-        surface_preprocessing_2(fileName, ...
-        unit);
+        surface_preprocessing_2(fileName,unit,instrument);
     
     parameters.parallel = ...
-        surface_analysis(zGrid,pointSpacing);
+        surface_analysis(zGrid,pointSpacing,numberOfScales,decimationFactor);
     
     parameters.perpendicular = ...
-        surface_analysis(zGrid',pointSpacing);
+        surface_analysis(zGrid',pointSpacing,numberOfScales, decimationFactor);
     
     parameters.pointSpacing = pointSpacing;
     parameters.fileName     = fileName;
+    parameters.Instrument   = instrument;
+    parameters.Decimation   = decimationFactor;
+    parameters.NumberOfSampledScales = NumberOfScales;
+    parameters.Date         = date;
     
     % save output
     fileNameSpec        = '%s_processing_output.mat';
