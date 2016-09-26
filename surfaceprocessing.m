@@ -1,4 +1,4 @@
-function [ ] = surfaceprocessing(unit)
+function [ ] = surfaceprocessing(unit,varargin)
 
 % Loops over input xyz files and makes an frequency spectrum.
 
@@ -25,6 +25,8 @@ fileIndex = find(~[files.isdir]);
 disp('Nice!')
 
 destination_directory = uigetdir;
+
+application = varargin{1};
 
 parfor iFile = 1:length(fileIndex)
     
