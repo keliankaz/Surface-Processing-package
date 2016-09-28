@@ -1,4 +1,4 @@
-function [ ] = surfaceprocessing(unit,varargin)
+function [ ] = surfaceprocessing(unit,toDo,varargin)
 
 % Loops over input xyz files and makes an frequency spectrum.
 
@@ -52,7 +52,7 @@ end
 parfor iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name;
-    parfor_process(fileName,unit,destination_directory,instrument,...
+    parfor_process(fileName,unit,toDo,destination_directory,instrument,...
                    numberOfScales, decimationFactor);
     
 end
@@ -61,19 +61,23 @@ end
 disp('Alright we are done here!')
 end
 
-function [] = parfor_process(fileName,unit,destination_directory, ...
+function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
                              instrument,numberOfScales,decimationFactor)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
 
+
+
     [surface, zGrid, pointSpacing] = ...
         surface_preprocessing_2(fileName,unit,instrument);
-    
+        
     parameters.parallel = ...
-        surface_analysis(zGrid,pointSpacing,numberOfScales,decimationFactor);
+        surface_analysis(zGrid,pointSpacing,numberOfScales, ...
+                         decimationFactor,toDo);
     
     parameters.perpendicular = ...
-        surface_analysis(zGrid',pointSpacing,numberOfScales, decimationFactor);
+        surface_analysis(zGrid',pointSpacing,numberOfScales, ...
+                         decimationFactor,toDo);
     
     parameters.pointSpacing = pointSpacing;
     parameters.fileName     = fileName;
