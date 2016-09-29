@@ -24,7 +24,7 @@ dxold=dx;
 % for interpolation  
 
 fxi=(0:Ny-1)'/(dx*Ny); 
-fxi=fxi(1:end/2);
+fxi=fxi(1:floor(end/2));
 
 warning off;  % don't display annoying interpolation warnings
 % define noise level = 4 std curvature

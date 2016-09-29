@@ -29,19 +29,22 @@ destination_directory = uigetdir;
 
 %% dealing with user inputs
 
-if nargin >=1
+nFixedInput = 2;
+vararginIndex = nargin - nFixedInput;
+
+if vararginIndex >=1
     instrument = varargin{1};
 else
     instrument = 'default';
 end
 
-if nargin >=2
+if vararginIndex >=2
     numberOfScales = varargin{2};
 else
     numberOfScales = 'default'; % default is ten scales
 end 
 
-if nargin >=3
+if vararginIndex >=3
     decimationFactor = varargin{3};
 else
     decimationFactor = 'default';
@@ -49,7 +52,7 @@ end
 
 %% process data:
 
-parfor iFile = 1:length(fileIndex)
+for iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name;
     parfor_process(fileName,unit,toDo,destination_directory,instrument,...
@@ -83,7 +86,7 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     parameters.fileName     = fileName;
     parameters.Instrument   = instrument;
     parameters.Decimation   = decimationFactor;
-    parameters.NumberOfSampledScales = NumberOfScales;
+    parameters.NumberOfSampledScales = numberOfScales;
     parameters.Date         = date;
     
     % save output
