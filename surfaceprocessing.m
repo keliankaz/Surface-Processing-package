@@ -60,15 +60,17 @@ destination_directory = uigetdir;
 
 %% dealing with user inputs
 
+% unit
 ind = strcmp(varargin,'unit');
-if ind ~= 0
+if ~isempty(ind)
     unit = varargin{find(ind)+1};
 else
     unit = 'm'; % meters (default)
 end 
 
+% to do list
 ind = strcmp(varargin,'toDo');
-if ind ~= 0
+if ~isempty(ind)
     toDo = varargin{find(ind)+1};
 else
     toDo = 'all'; % meters (default)
@@ -76,28 +78,31 @@ end
 
 % bypass skip preprocessing 'yes', 'no'
 ind = strcmp(varargin,'bypass');
-if ind ~= 0
+if ~isempty(ind)
     bypass = varargin{find(ind)+1};
 else
     bypass = 'no'; % meters (default)
 end 
 
+% instrument
 ind = strcmp(varargin,'instrument');
-if ind ~= 0
+if ~isempty(ind)
     instrument = varargin{find(ind)+1};
 else
     instrument = 'default';
 end
 
+% number of scale
 ind = strcmp(varargin,'numberOfScales');
-if ind ~= 0
+if ~isempty(ind)
     numberOfScales = varargin{find(ind)+1};
 else
     numberOfScales = 'default'; % default is ten scales
 end 
 
+% decimation factor
 ind = strcmp(varargin,'decimationFactor');
-if ind ~= 0
+if ~isempty(ind)
     decimationFactor = varargin{find(ind)+1};
 else
     decimationFactor = 'default';
@@ -118,14 +123,24 @@ disp('Alright we are done here!')
 end
 
 function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
-                             instrument,numberOfScales,decimationFactor)
+                             bypass,instrument,numberOfScales, ...
+                             decimationFactor)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
 
 
-
-    [surface, zGrid, pointSpacing] = ...
-        surface_preprocessing_2(fileName,unit,instrument);
+    if strcmp(bypass,'no')
+        [surface, zGrid, pointSpacing] = ...
+            surface_preprocessing_2(fileName,unit,instrument);
+        
+    elseif strcmp(bypass,'yes')
+        % import, parse and detrend data
+        [zGrid,pointSpacing] = parse_zygo_format('fileName',fileName, ...
+                                                 'detrend','yes');
+        surface = zGrid;
+    else
+        disp('warning bypass must be yes or no')
+    end
         
     parameters.parallel = ...
         surface_analysis(zGrid,pointSpacing,numberOfScales, ...
