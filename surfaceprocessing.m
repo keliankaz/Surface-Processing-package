@@ -1,16 +1,47 @@
-function [ ] = surfaceprocessing(unit,toDo,varargin)
+function [ ] = surfaceprocessing(varargin)
 
 % Loops over input xyz files and makes an frequency spectrum.
 
-% Input should be: the unit in which data is imported (i.e. 'mm', 'cm' or 'm') - it is then
-% converted into meters
+% Inputs:
+
+% all optional, MUST be in pairs with a (the order of pairs is not important): 
+
+% 'unit', followed by the unit in which data is imported (i.e. 'mircon', 'mm', 'cm' or 'm') - it is then
+% converted into meters (default is meters)
+
+% 'toDo', followed by the desired analyses on of: 'FFT','PLOMB',
+% 'parameters' or 'all' (default is 'all') - can be a cell array
+
+% 'bypass', followed by 'yes' or 'no' to  be used input is already in aligned clean grid form - input
+% files are then (default is 'no'). At the moment bypass is only available
+% for the proprietary white light format which includes point spacing
+% information in the file. Bypass activates the file parsing function to do
+% so.
+
+% 'numberOfScales' followed by the desired number of analysed scales. THis
+% has a lot of effect on the amount of processing time (default is 10)
+
+% 'decimationFactor' followed by the desired decimation factor (default is
+% 1)
+
+% 'instrument' followed by 'white light', 'laser scanner' or 'lidar'
+% (default does not set any instrument specific adjustments
 
 % User will be prompted to select the folder in which the scan files. There
 % should be NO other file in the folder. Files should have .xyz format.
 
 % point spacing is determined automatically based on the point density
 
+% todo cell array specifies desired analyses to do: 
+
+% bypass - 
+
 % output: files will be saved 
+
+%%%%%%%%%%%%%%
+%ex.
+
+% surfaceprocessing('unit', 'mm','instrument','white light','bypass','yes')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % running surface asymmetry function and saving files
@@ -29,23 +60,45 @@ destination_directory = uigetdir;
 
 %% dealing with user inputs
 
-nFixedInput = 2;
-vararginIndex = nargin - nFixedInput;
+ind = strcmp(varargin,'unit');
+if ind ~= 0
+    unit = varargin{find(ind)+1};
+else
+    unit = 'm'; % meters (default)
+end 
 
-if vararginIndex >=1
-    instrument = varargin{1};
+ind = strcmp(varargin,'toDo');
+if ind ~= 0
+    toDo = varargin{find(ind)+1};
+else
+    toDo = 'all'; % meters (default)
+end 
+
+% bypass skip preprocessing 'yes', 'no'
+ind = strcmp(varargin,'bypass');
+if ind ~= 0
+    bypass = varargin{find(ind)+1};
+else
+    bypass = 'no'; % meters (default)
+end 
+
+ind = strcmp(varargin,'instrument');
+if ind ~= 0
+    instrument = varargin{find(ind)+1};
 else
     instrument = 'default';
 end
 
-if vararginIndex >=2
-    numberOfScales = varargin{2};
+ind = strcmp(varargin,'numberOfScales');
+if ind ~= 0
+    numberOfScales = varargin{find(ind)+1};
 else
     numberOfScales = 'default'; % default is ten scales
 end 
 
-if vararginIndex >=3
-    decimationFactor = varargin{3};
+ind = strcmp(varargin,'decimationFactor');
+if ind ~= 0
+    decimationFactor = varargin{find(ind)+1};
 else
     decimationFactor = 'default';
 end
