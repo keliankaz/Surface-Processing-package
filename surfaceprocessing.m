@@ -7,7 +7,8 @@ function [ ] = surfaceprocessing(varargin)
 % all optional, MUST be in pairs with a (the order of pairs is not important): 
 
 % 'unit', followed by the unit in which data is imported (i.e. 'mircon', 'mm', 'cm' or 'm') - it is then
-% converted into meters (default is meters)
+% converted into meters (default is meters) - do not need to specify if
+% bypass for the zygo format is activated
 
 % 'toDo', followed by the desired analyses on of: 'FFT','PLOMB',
 % 'parameters' or 'all' (default is 'all') - can be a cell array
@@ -46,6 +47,8 @@ function [ ] = surfaceprocessing(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % running surface asymmetry function and saving files
 
+tic
+
 disp('Choose the input directory')
 directory_name = uigetdir;
 disp('good job!')
@@ -62,7 +65,7 @@ destination_directory = uigetdir;
 
 % unit
 ind = strcmp(varargin,'unit');
-if ~isempty(ind)
+if any(ind)
     unit = varargin{find(ind)+1};
 else
     unit = 'm'; % meters (default)
@@ -70,7 +73,7 @@ end
 
 % to do list
 ind = strcmp(varargin,'toDo');
-if ~isempty(ind)
+if any(ind)
     toDo = varargin{find(ind)+1};
 else
     toDo = 'all'; % meters (default)
@@ -78,15 +81,15 @@ end
 
 % bypass skip preprocessing 'yes', 'no'
 ind = strcmp(varargin,'bypass');
-if ~isempty(ind)
+if any(ind)
     bypass = varargin{find(ind)+1};
 else
-    bypass = 'no'; % meters (default)
+    bypass = 'no'; % (default)
 end 
 
 % instrument
 ind = strcmp(varargin,'instrument');
-if ~isempty(ind)
+if any(ind)
     instrument = varargin{find(ind)+1};
 else
     instrument = 'default';
@@ -94,7 +97,7 @@ end
 
 % number of scale
 ind = strcmp(varargin,'numberOfScales');
-if ~isempty(ind)
+if any(ind)
     numberOfScales = varargin{find(ind)+1};
 else
     numberOfScales = 'default'; % default is ten scales
@@ -102,7 +105,7 @@ end
 
 % decimation factor
 ind = strcmp(varargin,'decimationFactor');
-if ~isempty(ind)
+if any(ind)
     decimationFactor = varargin{find(ind)+1};
 else
     decimationFactor = 'default';
@@ -113,8 +116,8 @@ end
 for iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name;
-    parfor_process(fileName,unit,toDo,destination_directory,instrument,...
-                   numberOfScales, decimationFactor);
+    parfor_process(fileName,unit,toDo,destination_directory, bypass, ...
+                   instrument, numberOfScales, decimationFactor);
     
 end
 
@@ -127,7 +130,6 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
                              decimationFactor)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
-
 
     if strcmp(bypass,'no')
         [surface, zGrid, pointSpacing] = ...
@@ -156,6 +158,7 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     parameters.Decimation   = decimationFactor;
     parameters.NumberOfSampledScales = numberOfScales;
     parameters.Date         = date;
+    parameters.processingTime = toc;
     
     % save output
     fileNameSpec        = '%s_processing_output.mat';

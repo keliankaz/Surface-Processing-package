@@ -14,7 +14,7 @@ ind = strcmp(varargin,'fileName');
 fileName = varargin{find(ind)+1};
 
 ind = strcmp(varargin,'detrend');
-if ~isempty(ind)
+if any(ind)
     detrend = varargin{find(ind)+1};
 else
     detrend = 'no'; % default is to not detrend the input data
@@ -52,10 +52,7 @@ if strcmp(detrend,'yes')
         
     meanZ   = mean(z);
     z       = z-meanZ;
-    length(x)
-    length(z)
-    
-    
+  
     [n,~,p] = affine_fit([x,y,z]); % compute best fitting plane equation
     
     % remove the mean from the grid
