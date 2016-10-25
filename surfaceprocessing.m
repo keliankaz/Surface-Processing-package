@@ -1,6 +1,9 @@
 function [ ] = surfaceprocessing(varargin)
 
-% Loops over input xyz files and makes an frequency spectrum.
+% Loops over input files of spactial data and performs desired analyses
+% including FFT and PLOMB spectra; RMS , kurtosis, skewness parameters; ALL
+% along  profiles. Preprocessing can be performed to remove defects,
+% rotate data and align grids. 
 
 % Inputs:
 
@@ -13,11 +16,14 @@ function [ ] = surfaceprocessing(varargin)
 % 'toDo', followed by the desired analyses on of: 'FFT','PLOMB',
 % 'parameters' or 'all' (default is 'all') - can be a cell array
 
-% 'bypass', followed by 'yes' or 'no' to  be used input is already in aligned clean grid form - input
-% files are then (default is 'no'). At the moment bypass is only available
-% for the proprietary white light format which includes point spacing
-% information in the file. Bypass activates the file parsing function to do
-% so.
+% 'bypass', followed by 'zygo' 'pre-processing' or 'no' to  be used
+% input is already in aligned clean grid form - input files are then
+% (default is 'no'). zygo is adapted to the proprietary data format of the
+% white light in wong. the 'pre-processing' option requires a .mat
+% structure with a field named 'grid' with the topography and a field name
+% 'pointSpacing' specifying the point spacing (in meters). In either case
+% the topography must be aligned such that the positive x direction is the
+% parallel direction
 
 % 'numberOfScales' followed by the desired number of analysed scales. THis
 % has a lot of effect on the amount of processing time (default is 10)
@@ -33,16 +39,13 @@ function [ ] = surfaceprocessing(varargin)
 
 % point spacing is determined automatically based on the point density
 
-% todo cell array specifies desired analyses to do: 
-
-% bypass - 
-
 % output: files will be saved 
 
-%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %ex.
 
-% surfaceprocessing('unit', 'mm','instrument','white light','bypass','yes')
+% surfaceprocessing('unit', 'mm','instrument','white light','bypass', ...
+%                   'zygo')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % running surface asymmetry function and saving files
@@ -135,10 +138,16 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
         [surface, zGrid, pointSpacing] = ...
             surface_preprocessing_2(fileName,unit,instrument);
         
-    elseif strcmp(bypass,'yes')
+    elseif strcmp(bypass,'zygo')
         % import, parse and detrend data
         [zGrid,pointSpacing] = parse_zygo_format('fileName',fileName, ...
                                                  'detrend','yes');
+        surface     = zGrid;
+        
+    elseif strcmp(bypass,'pre-processing')
+        structIn    = load(fileName);
+        zGrid       = structIn.grid;
+        pointSpacing= structIn.pointSpacing;
         surface = zGrid;
     else
         disp('warning bypass must be yes or no')
@@ -159,7 +168,7 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     parameters.NumberOfSampledScales = numberOfScales;
     parameters.Date         = date;
     parameters.processingTime = toc;
-    
+        
     % save output
     fileNameSpec        = '%s_processing_output.mat';
     outputFileName      = sprintf(fileNameSpec,fileName);
