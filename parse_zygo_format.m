@@ -23,8 +23,8 @@ end
 delimeter = ' ';
 FID       = fopen(fileName);
 
-numX = dlmread(fileName,delimeter,[3 2 3 2]);
-numY = dlmread(fileName,delimeter,[3 3 3 3]);
+numY = dlmread(fileName,delimeter,[3 2 3 2]);
+numX = dlmread(fileName,delimeter,[3 3 3 3]);
 pointSpacing = dlmread(fileName,delimeter,[7 6 7 6]);
 
 Zdata = textscan(FID,'%*f %*f %f','Delimiter',' ','HeaderLines', ...
