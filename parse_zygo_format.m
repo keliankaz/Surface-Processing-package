@@ -32,7 +32,7 @@ Zdata = textscan(FID,'%*f %*f %f','Delimiter',' ','HeaderLines', ...
 z     = Zdata{1,1};
 z     = z*10^-6; % convert to meters
 
-grid = reshape(z,numX,numY);
+grid = reshape(z,numY,numX);
 
 if strcmp(detrend,'yes')
     
