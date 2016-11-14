@@ -1,6 +1,7 @@
 function  parameterStruct = surface_analysis(surfaceGrid, pointSpacing, ...
                                              numberOfScales, ...
-                                             decimationFactor, toDo)
+                                             decimationFactor, toDo, ...
+                                             smoothing)
 
 % the grunt of the analysis is done here...
 
@@ -23,7 +24,7 @@ end
 
 if sum(strcmp(toDo,'FFT'))>=1 || strcmp(toDo,'all')
     [fx1, PowerStructx] =  frequency_spectrum(surfaceGrid, pointSpacing, ...
-                                              decimationFactor);
+                                              decimationFactor,smoothing);
 
     % process output - concatonate the structure array  (I think)
     [Nx,Ny]             = size(PowerStructx);

@@ -34,6 +34,9 @@ function [ ] = surfaceprocessing(varargin)
 % 'instrument' followed by 'white light', 'laser scanner' or 'lidar'
 % (default does not set any instrument specific adjustments
 
+% 'smoothing' followed by 'off' or 'on' to turn off the smoothing script that is
+% part of the fourrier spectrum calsulation (default is 'on')
+
 % User will be prompted to select the folder in which the scan files. There
 % should be NO other file in the folder. Files should have .xyz format.
 
@@ -114,13 +117,21 @@ else
     decimationFactor = 'default';
 end
 
+% decimation factor
+ind = strcmp(varargin,'smoothing');
+if any(ind)
+    smoothing = varargin{find(ind)+1};
+else
+    smoothing = 'on';
+end
+
 %% process data:
 
 for iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name;
     parfor_process(fileName,unit,toDo,destination_directory, bypass, ...
-                   instrument, numberOfScales, decimationFactor);
+                   instrument, numberOfScales, decimationFactor,smoothing);
     
 end
 
@@ -130,7 +141,7 @@ end
 
 function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
                              bypass,instrument,numberOfScales, ...
-                             decimationFactor)
+                             decimationFactor,smoothing)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
 
@@ -155,11 +166,11 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
         
     parameters.parallel = ...
         surface_analysis(zGrid,pointSpacing,numberOfScales, ...
-                         decimationFactor,toDo);
+                         decimationFactor,toDo,smoothing);
     
     parameters.perpendicular = ...
         surface_analysis(zGrid',pointSpacing,numberOfScales, ...
-                         decimationFactor,toDo);
+                         decimationFactor,toDo,smoothing);
     
     parameters.pointSpacing = pointSpacing;
     parameters.fileName     = fileName;
@@ -168,6 +179,7 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     parameters.NumberOfSampledScales = numberOfScales;
     parameters.Date         = date;
     parameters.processingTime = toc;
+    parameters.smoothing    = smoothing;
         
     % save output
     fileNameSpec        = '%s_processing_output.mat';
