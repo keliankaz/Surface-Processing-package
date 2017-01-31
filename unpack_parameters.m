@@ -75,12 +75,13 @@ end
 end
 
 
+%% plot a metric of roughness vs displacement
 function [] = roughnessVsDisp(desiredPlot, inputs)
 
 [files, numFiles,fileIndex] = getfiles();
 
 % identify data
-orientation = inputs{1};
+orientation  = inputs{1};
 displacement = inputs{2};
 scale        = inputs{3};
 
@@ -121,7 +122,9 @@ for iFile = 1:numFiles
     PxNanInd            = isnan(Px);
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
-    d                   = polyfit(log10(1./fx),log10(Px'),1);
+    
+    d                   = makebestfit(fx,Px);
+%     d                   = polyfit(log10(1./fx),log10(Px'),1);
     
     % this is a bit awkward but fuckit im tired (if nargin is 7 we
     % basically continue with the same code but instead of using the
@@ -139,7 +142,7 @@ for iFile = 1:numFiles
         
     % Handle the conversion to RMS as done in Brodsky et al., 2011
     % P(lambda) = C*lambda^BETA
-    % 
+     
     elseif strcmp(desiredPlot,'RMSVsDisp')
         C = 10^d(2);
         BETA = d(1);
@@ -220,6 +223,7 @@ plot(log10(minmaxD),(d(1)*log10(minmaxD) + d(2)), 'Linewidth',2);
 hold off
 end
 
+%% plot a specific, or many, grids (surfaces) 
 function [] = plotgrid(inputs)
 
 desiredFileNameArray = inputs{1};
@@ -251,7 +255,8 @@ for iGrid = 1:numGrid;
     titel('Pre-processed Grid')
 end
 end
-    
+
+%% plot all the frequency spectra in a given file
 function [] = plotspectra(desiredPlot,inputs)
 
 [files, numFiles,fileIndex] = getfiles();
@@ -375,6 +380,7 @@ legend(legendArray,'interpreter', 'none')
 
 end
 
+%% small function to query the files in the desired directory
 function [files, numFiles, fileIndex] = getfiles()
 directory_name = uigetdir;
 files = dir(directory_name);
@@ -384,6 +390,61 @@ fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'.DS_Store'));
 numFiles  = length(fileIndex);
 end
 
+%% best fit the spectra while not letting instrument artefact affect results
+function [d] = makebestfit(F,P,varargin);
+    % small function to make the best fit of the power spectrum
+    
+    % ensure the vectors are of the same size/dimension
+    if length(F) == length(P)
+        if size(F) ~= size(P)
+            P = P';
+        end
+        
+        % make default setting
+        defaultStruct.FitMethod     = 'default';
+        defaultStruct.SectionVal    = 1/2;
+        
+        % adapt defualt structure
+        setVal('FitMethod')
+        setVal('SectionVal')
+        
+        S = defaultStruct;
+
+        if strcmp(S.FitMethod, 'default')
+            % Simplest form: take the fit over the entire calculated spectrum:
+            d           = polyfit(log10(1./F),log10(P),1);
+        
+        elseif strcmp(S.FitMethod, 'section')
+                    % Uninspired, but better form: take the best fit only on a
+        % specifict section of the fit.
+        
+        % In the case of the scan data, this
+        % only takes into account the larger wave lengths where the data
+        % should not be affected by instrumental artefacts
+            
+            numIn       = length(F);
+            numEntries  = ceil(numin*S.SectionVal);
+            start       = numIn-numEntries;
+            newF        = F(start:end);
+            newP        = P(start:end);
+            
+            d           = polyfit(log10(1./newF,newP));
+        end
+        
+    
+    else
+        disp('error in the code making the best fit, input vectors must be the same length')
+    end
+    
+    
+    function setVal(name)
+        ind = strcmp(name, varargin);
+        if any(ind)
+            setfield(defaultStruct,name,varargin{1,ind+1});
+        end
+    end
+        
+end
 
     
     
