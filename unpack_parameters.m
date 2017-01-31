@@ -380,7 +380,7 @@ directory_name = uigetdir;
 files = dir(directory_name);
 addpath(directory_name)
 
-fileIndex = find(~[files.isdir]);
+fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'.DS_Store'));
 numFiles  = length(fileIndex);
 end
 

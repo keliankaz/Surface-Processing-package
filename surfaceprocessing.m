@@ -9,9 +9,9 @@ function [ ] = surfaceprocessing(varargin)
 
 % all optional, MUST be in pairs with a (the order of pairs is not important): 
 
-% 'unit', followed by the unit in which data is imported (i.e. 'mircon', 'mm', 'cm' or 'm') - it is then
-% converted into meters (default is meters) - do not need to specify if
-% bypass for the zygo format is activated
+% 'unit', followed by the unit in which data is imported (i.e. 'mircon',
+% 'mm', 'cm' or 'm') - it is then converted into meters (default is meters)
+% - do not need to specify if bypass for the zygo format is activated
 
 % 'toDo', followed by the desired analyses on of: 'FFT','PLOMB',
 % 'parameters' or 'all' (default is 'all') - can be a cell array
@@ -34,9 +34,6 @@ function [ ] = surfaceprocessing(varargin)
 % 'instrument' followed by 'white light', 'laser scanner' or 'lidar'
 % (default does not set any instrument specific adjustments
 
-% 'smoothing' followed by 'off' or 'on' to turn off the smoothing script that is
-% part of the fourrier spectrum calsulation (default is 'on')
-
 % User will be prompted to select the folder in which the scan files. There
 % should be NO other file in the folder. Files should have .xyz format.
 
@@ -47,8 +44,7 @@ function [ ] = surfaceprocessing(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %ex.
 
-% surfaceprocessing('unit', 'mm','instrument','white light','bypass', ...
-%                   'zygo')
+% surfaceprocessing('bypass', 'zygo','toDo', 'FFT','decimationFactor',5)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % running surface asymmetry function and saving files
@@ -62,10 +58,10 @@ files = dir(directory_name);
 addpath(directory_name)
 
 disp('Now choose the output directory')
-fileIndex = find(~[files.isdir]);
-disp('Nice!')
+fileIndex = find(~[files.isdir] & ~strcmp({files.name},'.DS_Store'));
 
 destination_directory = uigetdir;
+disp('Nice!')
 
 %% dealing with user inputs
 
@@ -117,21 +113,13 @@ else
     decimationFactor = 'default';
 end
 
-% decimation factor
-ind = strcmp(varargin,'smoothing');
-if any(ind)
-    smoothing = varargin{find(ind)+1};
-else
-    smoothing = 'on';
-end
-
 %% process data:
 
 for iFile = 1:length(fileIndex)
     
-    fileName            = files(fileIndex(iFile)).name;
+    fileName            = files(fileIndex(iFile)).name
     parfor_process(fileName,unit,toDo,destination_directory, bypass, ...
-                   instrument, numberOfScales, decimationFactor,smoothing);
+                   instrument, numberOfScales, decimationFactor);
     
 end
 
@@ -141,7 +129,7 @@ end
 
 function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
                              bypass,instrument,numberOfScales, ...
-                             decimationFactor,smoothing)
+                             decimationFactor)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
 
@@ -166,11 +154,11 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
         
     parameters.parallel = ...
         surface_analysis(zGrid,pointSpacing,numberOfScales, ...
-                         decimationFactor,toDo,smoothing);
+                         decimationFactor,toDo);
     
     parameters.perpendicular = ...
         surface_analysis(zGrid',pointSpacing,numberOfScales, ...
-                         decimationFactor,toDo,smoothing);
+                         decimationFactor,toDo);
     
     parameters.pointSpacing = pointSpacing;
     parameters.fileName     = fileName;
@@ -179,7 +167,6 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     parameters.NumberOfSampledScales = numberOfScales;
     parameters.Date         = date;
     parameters.processingTime = toc;
-    parameters.smoothing    = smoothing;
         
     % save output
     fileNameSpec        = '%s_processing_output.mat';

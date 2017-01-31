@@ -1,4 +1,4 @@
-function [fx,PowerStructx]=frequency_spectrum(Z,dx,decimation,smoothing)
+function [fx,PowerStructx]=frequency_spectrum(Z,dx,decimation)
 % Runs a fast fourier transform for an N by M array (Z) along all profiles
 % along x (along increasing M dimension).
 
@@ -53,7 +53,7 @@ for i=1:Nx,
         for isegment=1:length(Iz)-1,   
             z=zfinite(Iz(isegment):Iz(isegment+1)-1);
             if (length(z)>Nmin),
-                [p,f]=powerspect(z,dx,NoiseLevel,smoothing);
+                [p,f]=powerspect(z,dx,NoiseLevel);
             else
                 p=[NaN NaN];
                 f=[0 1000];
@@ -82,28 +82,24 @@ fx=fxi;
 end
 
 %%%%%%%%%%%%%%spectral estimation function
-function [p,f,ph] = powerspect(z,dx, NoiseLevel,smoothing)
+function [p,f,ph] = powerspect(z,dx, NoiseLevel)
     
     % NoiseLevel=maximum reasonable value of 2nd deriv
     N=length(z);
     
-    if strcmp(smoothing,'on')
+    % check for large 2nd derivs
+    z2=diff(z,2)./dx.^2;
+    I=(abs(z2)>(4*std(abs(z2)))); % SMOOTHED ACCORDING TO TIBO
+    %I=(abs(z2)>NoiseLevel); % ORIGINAL SMOOTHING
     
-        % check for large 2nd derivs
+    while (sum(I)>0)
+        
+        Iz=logical([0 I' 0]');% shift to the z equivalent
+        Ibefore=logical([I' 0 0]'); % index before
+        Iafter=logical([0 Iz(1:end-1)']'); %index after
+        z(Iz)=(z(Ibefore)+z(Iafter))/2;  
         z2=diff(z,2)./dx.^2;
-        I=(abs(z2)>(4*std(abs(z2)))); % SMOOTHED ACCORDING TO TIBO
-        %I=(abs(z2)>NoiseLevel); % ORIGINAL SMOOTHING
-        
-        while (sum(I)>0)
-            
-            Iz=logical([0 I' 0]');% shift to the z equivalent
-            Ibefore=logical([I' 0 0]'); % index before
-            Iafter=logical([0 Iz(1:end-1)']'); %index after
-            z(Iz)=(z(Ibefore)+z(Iafter))/2;
-            z2=diff(z,2)./dx.^2;
-            I=(abs(z2)>(4*std(abs(z2))));
-        end
-        
+        I=(abs(z2)>(4*std(abs(z2))));
     end
     
     z=z-mean(z);
