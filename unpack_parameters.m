@@ -39,6 +39,10 @@ function [] = unpack_parameters(desiredPlot, varargin)
 %       'prefactor'     : evolution of the prefactor with displacement
 %   fileName        : string with the desired file name for the 'Grids' plot
 
+%   pair-wise inputs:
+%       'magnification',mag: specifier magnification followed by the
+%                            desired magnification
+
 
 
 % User will be prompted to navigate to the directory in which the surface
@@ -99,6 +103,17 @@ if numIn >= 6
     parameter = inputs{6};
 end
 
+% additional inputs parsed into structure
+
+% default values
+S = []; % init structure
+S.magnification = 'all';
+
+ % the magnification will be specified according to user specified double
+ % e.g. unpack_paramaeters(...,'magnification',mag)
+ % where mag is a list with desired magnifications specified by user
+S = setVal(S,'magnification',inputs)
+
 % create the displacement "domain" - for line plotting
 
 minD        = min(displacement(displacement~=0));
@@ -124,7 +139,6 @@ for iFile = 1:numFiles
     Px                  = Px(~PxNanInd);
     
     d                   = makebestfit(fx,Px,'FitMethod','section');
-%     d                   = polyfit(log10(1./fx),log10(Px'),1);
     
     % this is a bit awkward but fuckit im tired (if nargin is 7 we
     % basically continue with the same code but instead of using the
@@ -223,208 +237,207 @@ plot(log10(minmaxD),(d(1)*log10(minmaxD) + d(2)), 'Linewidth',2);
 hold off
 end
 
-%% plot a specific, or many, grids (surfaces) 
-function [] = plotgrid(inputs)
-
-desiredFileNameArray = inputs{1};
-numGrid  = length(desiredFileNameArray);
-subplotCount = 0;
-
-for iGrid = 1:numGrid;
-    
-    load(desiredFileNameArray{iGrid})
-    originalGrid = getfield(parameters,'zGrid');
-    cleanGrid    = getfield(parameters,'newZGrid');
-    
-    subplotCount = subplotCount + 1;
-    
-    subplot(iGrid,2,subplotCount)
-    imagesc(originalGrid)
-    axis equal
-    xlabel('x')
-    ylabel('y')
-    title('Original Grid')
-    
-    subplotCount = subplotCount + 1;
-    
-    subplot(numGrid,2,subplotCount)
-    imagesc(cleanGrid)
-    axis equal
-    xlabel('Slip Perpendicular')
-    ylabel('Slip Parallel')
-    titel('Pre-processed Grid')
-end
-end
+%% plot a specific, or many, grids (surfaces)
+    function [] = plotgrid(inputs)
+        
+        desiredFileNameArray = inputs{1};
+        numGrid  = length(desiredFileNameArray);
+        subplotCount = 0;
+        
+        for iGrid = 1:numGrid;
+            
+            load(desiredFileNameArray{iGrid})
+            originalGrid = getfield(parameters,'zGrid');
+            cleanGrid    = getfield(parameters,'newZGrid');
+            
+            subplotCount = subplotCount + 1;
+            
+            subplot(iGrid,2,subplotCount)
+            imagesc(originalGrid)
+            axis equal
+            xlabel('x')
+            ylabel('y')
+            title('Original Grid')
+            
+            subplotCount = subplotCount + 1;
+            
+            subplot(numGrid,2,subplotCount)
+            imagesc(cleanGrid)
+            axis equal
+            xlabel('Slip Perpendicular')
+            ylabel('Slip Parallel')
+            titel('Pre-processed Grid')
+        end
+    end
 
 %% plot all the frequency spectra in a given file
-function [] = plotspectra(desiredPlot,inputs)
-
-[files, numFiles,fileIndex] = getfiles();
-
-legendArray = cell(1,numFiles);
-orientation = inputs{1};
-hold on
-
-if length(inputs) >= 2
-    displacement = inputs{2};
-    D = displacement;
-    minD = min(D(D~=0));
-    maxD = max(D);
-    logMinD = log10(minD);
-    logMaxD = log10(maxD);
-    logDelD = logMaxD-logMinD;
-    
-end
-
-if length(inputs) >=3
-    constraint = inputs{3};    
-end
-
-% loop over files
-for iFile = 1:numFiles
-    fileName            = files(fileIndex(iFile)).name;
-    load(fileName)
-    
-    if strcmp(desiredPlot,'best fits')
-        desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
-        desiredCell     = desiredStruct;
+    function [] = plotspectra(desiredPlot,inputs)
         
-        wavelength      = 1./desiredCell{1};
-        power           = desiredCell{2};
+        [files, numFiles,fileIndex] = getfiles();
         
-        power           = power(1:length(wavelength));
-        nanInd          = isnan(power);
-        power           = power(~nanInd);
-        wavelength      = wavelength(~nanInd);
+        legendArray = cell(1,numFiles);
+        orientation = inputs{1};
+        hold on
         
-        d               = polyfit(log10(wavelength'),log10(power),1);
-        x               = [min(wavelength),max(wavelength)];
-        y               = 10.^(d(1)*log10(x)+d(2));
-        
-    else
-        desiredStruct   = getfield(getfield(parameters, orientation),desiredPlot);
-        
-        % decide what plot to do (enable plot-specific attributes)
-        if strcmp(desiredPlot,'FFT') || strcmp(desiredPlot,'PLOMB')
-            desiredCell     = desiredStruct;
-            x               = desiredCell{1};
-            x               = 1./x;
-            y               = desiredCell{2};
-            y               = y(1:length(x));
+        if length(inputs) >= 2
+            displacement = inputs{2};
+            D = displacement;
+            minD = min(D(D~=0));
+            maxD = max(D);
+            logMinD = log10(minD);
+            logMaxD = log10(maxD);
+            logDelD = logMaxD-logMinD;
             
-        else
-            x               = getfield(getfield(parameters, orientation),'Scales');
-            if strcmp(desiredPlot, 'avgAsyms')
-                badInd          = isnan(desiredStruct)|desiredStruct == 0;
-                y               = abs(desiredStruct(~badInd));
-                x               = x(~badInd);
+        end
+        
+        if length(inputs) >=3
+            constraint = inputs{3};
+        end
+        
+        % loop over files
+        for iFile = 1:numFiles
+            fileName            = files(fileIndex(iFile)).name;
+            load(fileName)
+            
+            if strcmp(desiredPlot,'best fits')
+                desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
+                desiredCell     = desiredStruct;
+                
+                wavelength      = 1./desiredCell{1};
+                power           = desiredCell{2};
+                
+                power           = power(1:length(wavelength));
+                nanInd          = isnan(power);
+                power           = power(~nanInd);
+                wavelength      = wavelength(~nanInd);
+                
+                d               = polyfit(log10(wavelength'),log10(power),1);
+                x               = [min(wavelength),max(wavelength)];
+                y               = 10.^(d(1)*log10(x)+d(2));
+                
             else
-                y               = desiredStruct;
-                y               = y(y~=0);
-                x               = x(y~=0);
+                desiredStruct   = getfield(getfield(parameters, orientation),desiredPlot);
+                
+                % decide what plot to do (enable plot-specific attributes)
+                if strcmp(desiredPlot,'FFT') || strcmp(desiredPlot,'PLOMB')
+                    desiredCell     = desiredStruct;
+                    x               = desiredCell{1};
+                    x               = 1./x;
+                    y               = desiredCell{2};
+                    y               = y(1:length(x));
+                    
+                else
+                    x               = getfield(getfield(parameters, orientation),'Scales');
+                    if strcmp(desiredPlot, 'avgAsyms')
+                        badInd          = isnan(desiredStruct)|desiredStruct == 0;
+                        y               = abs(desiredStruct(~badInd));
+                        x               = x(~badInd);
+                    else
+                        y               = desiredStruct;
+                        y               = y(y~=0);
+                        x               = x(y~=0);
+                    end
+                    
+                end
             end
             
+            scanName = getfield(parameters,'fileName');
+            
+            % create the plots
+            if length(inputs) == 1
+                plot(x,y,'.-')
+                legendArray{1,iFile} = fileName;
+                
+            elseif length(inputs) >= 2
+                % set color as a function of displacement
+                if D(iFile) == 0
+                    colorForDisp = [0 1 0];
+                else
+                    colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
+                    colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
+                end
+                
+                % set unknow displacements to grey
+                if sum(isnan(colorForDisp)) ~= 0
+                    colorForDisp = [0.5, 0.5, 0.5];
+                end
+                
+                p = plot(x,y,'-');
+                p.Color = colorForDisp;
+                formatSpec = 'D = %d - file: %s';
+                legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
+                    scanName);
+                xlabel('Scale (m)')
+            end
+            
+            % to help distinguish points whith various constraints on displacement
+            if length(inputs) >=3
+                if strcmp(constraint{iFile}, 'Direct')
+                    p.LineWidth = 3;
+                elseif strcmp(constraint{iFile},'Upper Bound')
+                    p.LineWidth = 0.2;
+                end
+            end
+            
+            
+            ylabel(desiredPlot)
+            title([desiredPlot,' as a function of scale - ', orientation, date])
+            
+            if strcmp(desiredPlot,'topostd') || strcmp(desiredPlot,'FFT')|| ...
+                    strcmp(desiredPlot,'PLOMB')
+                set(gca,'XScale','log','YScale','log')
+                xlabel('Scale (log(m))')
+            end
         end
-    end
-    
-    scanName = getfield(parameters,'fileName');
-   
-    % create the plots
-    if length(inputs) == 1
-        plot(x,y,'.-')
-        legendArray{1,iFile} = fileName;
         
-    elseif length(inputs) >= 2
-        % set color as a function of displacement
-        if D(iFile) == 0
-            colorForDisp = [0 1 0];
-        else
-            colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
-            colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
-        end
+        legend(legendArray,'interpreter', 'none')
         
-        % set unknow displacements to grey
-        if sum(isnan(colorForDisp)) ~= 0
-            colorForDisp = [0.5, 0.5, 0.5];
-        end
-        
-        p = plot(x,y,'-');
-        p.Color = colorForDisp;
-        formatSpec = 'D = %d - file: %s';
-        legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
-            scanName);
-        xlabel('Scale (m)')
     end
-    
-     % to help distinguish points whith various constraints on displacement
-    if length(inputs) >=3
-        if strcmp(constraint{iFile}, 'Direct')
-            p.LineWidth = 3;
-        elseif strcmp(constraint{iFile},'Upper Bound')
-            p.LineWidth = 0.2;
-        end
-    end
-   
-    
-    ylabel(desiredPlot)
-    title([desiredPlot,' as a function of scale - ', orientation, date])
-    
-    if strcmp(desiredPlot,'topostd') || strcmp(desiredPlot,'FFT')|| ... 
-            strcmp(desiredPlot,'PLOMB')
-        set(gca,'XScale','log','YScale','log')
-        xlabel('Scale (log(m))')
-    end  
-end
-
-legend(legendArray,'interpreter', 'none')
-
-end
 
 %% small function to query the files in the desired directory
-function [files, numFiles, fileIndex] = getfiles()
-directory_name = uigetdir;
-files = dir(directory_name);
-addpath(directory_name)
-save('files', 'files')
-
-fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'._.DS_Store') & ~ strcmp({files.name},'.DS_Store'));
-numFiles  = length(fileIndex);
-end
+    function [files, numFiles, fileIndex] = getfiles()
+        directory_name = uigetdir;
+        files = dir(directory_name);
+        addpath(directory_name)
+        save('files', 'files')
+        
+        fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'._.DS_Store') & ~ strcmp({files.name},'.DS_Store'));
+        numFiles  = length(fileIndex);
+    end
 
 %% best fit the spectra while not letting instrument artefact affect results
-function [d] = makebestfit(F,P,varargin)
-    % small function to make the best fit of the power spectrum
-%     
-%     % ensure the vectors are of the same size/dimension
-%     if length(F) == length(P)
+    function [d] = makebestfit(F,P,varargin)
+        % small function to make the best fit of the power spectrum
+        %
+        %     % ensure the vectors are of the same size/dimension
+        %     if length(F) == length(P)
         if size(F) ~= size(P)
             P = P';
         end
-%         
-%         % make default setting
-%         defaultStruct.FitMethod     = 'default';
-         defaultStruct.SectionVal    = 2/3;
-%         
-%         % adapt defualt structure
-%         defaultStruct = setVal(defaultStruct,'FitMethod');
-%         defaultStruct = setVal(defaultStruct,'SectionVal');
-%         
-         S = defaultStruct;
-% 
-%         if strcmp(S.FitMethod, 'default')
-%             % Simplest form: take the fit over the entire calculated spectrum:
-%             d           = polyfit(log10(1./F),log10(P),1);
-%         
-%         elseif strcmp(S.FitMethod, 'section')
-%                     % Uninspired, but better form: take the best fit only on a
-%         % specifict section of the fit.
-%         
-%         % In the case of the scan data, this
-%         % only takes into account the larger wave lengths where the data
-%         % should not be affected by instrumental artefacts
-%             
-%         disp('Hello')
-%         
+        
+        % make default setting
+        defaultStruct.FitMethod     = 'default';
+        defaultStruct.SectionVal    = 2/3;
+        
+        % adapt defualt structure
+        input = varargin;
+        defaultStruct = setVal(defaultStruct,'FitMethod',input);
+        defaultStruct = setVal(defaultStruct,'SectionVal',input);
+        
+        S = defaultStruct;
+        
+        if strcmp(S.FitMethod, 'default')
+            % Simplest form: take the fit over the entire calculated spectrum:
+            d           = polyfit(log10(1./F),log10(P),1);
+            
+        elseif strcmp(S.FitMethod, 'section')
+            % Uninspired, but better form: take the best fit only on a
+            % specifict section of the fit.
+            
+            % In the case of the scan data, this
+            % only takes into account the larger wave lengths where the data
+            % should not be affected by instrumental artefacts
+            
             numIn       = length(F);
             numEntries  = ceil(numIn*S.SectionVal);
             start       = numIn-numEntries;
@@ -432,22 +445,21 @@ function [d] = makebestfit(F,P,varargin)
             newP        = P(start:end);
             
             d           = polyfit(log10(1./newF),log10(newP),1);
-%         end
-%         
-%     
-%     else
-%         disp('error in the code making the best fit, input vectors must be the same length')
-%     end
-%     
-%     
-%     function S = setVal(S, name)
-%         ind = strcmp(name, varargin);
-%         if any(ind)
-%             S = setfield(S,name,varargin{1,ind+1});
-%         end
-%     end
-%         
-end
+            
+            
+        else
+            disp('error in the code making the best fit, input vectors must be the same length')
+        end
+    end
 
-    
+    function S = setVal(S, name, input)
+        % set user specified inputs to a default structure based on "pair-wise
+        % input"
+        ind = strcmp(name, input);
+        if any(ind)
+            S.(name) = input{1,ind+1};
+        end
+    end
+
+        
     
