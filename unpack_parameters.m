@@ -123,7 +123,7 @@ for iFile = 1:numFiles
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
     
-    d                   = makebestfit(fx,Px);
+    d                   = makebestfit(fx,Px,'FitMethod','section');
 %     d                   = polyfit(log10(1./fx),log10(Px'),1);
     
     % this is a bit awkward but fuckit im tired (if nargin is 7 we
@@ -187,12 +187,12 @@ else
     colorSpec = zeros(numFiles,3);
 end
 
-% offset = 0.01;
-% % t = text(log10(displacement)+offset,Power+offset,fileNameArray,'interpreter', 'none');
-% 
-% for iFile = 1:numFiles
-%     t(iFile).Color = colorSpec(iFile,:);
-% end
+offset = 0.01;
+t = text(log10(displacement)+offset,Power+offset,fileNameArray,'interpreter', 'none');
+
+for iFile = 1:numFiles
+    t(iFile).Color = colorSpec(iFile,:);
+end
 
 
 
@@ -385,65 +385,68 @@ function [files, numFiles, fileIndex] = getfiles()
 directory_name = uigetdir;
 files = dir(directory_name);
 addpath(directory_name)
+save('files', 'files')
 
-fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'.DS_Store'));
+fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'._.DS_Store') & ~ strcmp({files.name},'.DS_Store'));
 numFiles  = length(fileIndex);
 end
 
 %% best fit the spectra while not letting instrument artefact affect results
-function [d] = makebestfit(F,P,varargin);
+function [d] = makebestfit(F,P,varargin)
     % small function to make the best fit of the power spectrum
-    
-    % ensure the vectors are of the same size/dimension
-    if length(F) == length(P)
+%     
+%     % ensure the vectors are of the same size/dimension
+%     if length(F) == length(P)
         if size(F) ~= size(P)
             P = P';
         end
-        
-        % make default setting
-        defaultStruct.FitMethod     = 'default';
-        defaultStruct.SectionVal    = 1/2;
-        
-        % adapt defualt structure
-        setVal('FitMethod')
-        setVal('SectionVal')
-        
-        S = defaultStruct;
-
-        if strcmp(S.FitMethod, 'default')
-            % Simplest form: take the fit over the entire calculated spectrum:
-            d           = polyfit(log10(1./F),log10(P),1);
-        
-        elseif strcmp(S.FitMethod, 'section')
-                    % Uninspired, but better form: take the best fit only on a
-        % specifict section of the fit.
-        
-        % In the case of the scan data, this
-        % only takes into account the larger wave lengths where the data
-        % should not be affected by instrumental artefacts
-            
+%         
+%         % make default setting
+%         defaultStruct.FitMethod     = 'default';
+         defaultStruct.SectionVal    = 2/3;
+%         
+%         % adapt defualt structure
+%         defaultStruct = setVal(defaultStruct,'FitMethod');
+%         defaultStruct = setVal(defaultStruct,'SectionVal');
+%         
+         S = defaultStruct;
+% 
+%         if strcmp(S.FitMethod, 'default')
+%             % Simplest form: take the fit over the entire calculated spectrum:
+%             d           = polyfit(log10(1./F),log10(P),1);
+%         
+%         elseif strcmp(S.FitMethod, 'section')
+%                     % Uninspired, but better form: take the best fit only on a
+%         % specifict section of the fit.
+%         
+%         % In the case of the scan data, this
+%         % only takes into account the larger wave lengths where the data
+%         % should not be affected by instrumental artefacts
+%             
+%         disp('Hello')
+%         
             numIn       = length(F);
-            numEntries  = ceil(numin*S.SectionVal);
+            numEntries  = ceil(numIn*S.SectionVal);
             start       = numIn-numEntries;
             newF        = F(start:end);
             newP        = P(start:end);
             
-            d           = polyfit(log10(1./newF,newP));
-        end
-        
-    
-    else
-        disp('error in the code making the best fit, input vectors must be the same length')
-    end
-    
-    
-    function setVal(name)
-        ind = strcmp(name, varargin);
-        if any(ind)
-            setfield(defaultStruct,name,varargin{1,ind+1});
-        end
-    end
-        
+            d           = polyfit(log10(1./newF),log10(newP),1);
+%         end
+%         
+%     
+%     else
+%         disp('error in the code making the best fit, input vectors must be the same length')
+%     end
+%     
+%     
+%     function S = setVal(S, name)
+%         ind = strcmp(name, varargin);
+%         if any(ind)
+%             S = setfield(S,name,varargin{1,ind+1});
+%         end
+%     end
+%         
 end
 
     
