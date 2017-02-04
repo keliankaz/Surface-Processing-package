@@ -452,6 +452,7 @@ end
         end
     end
 
+%% input parsing function    
     function S = setVal(S, name, input)
         % set user specified inputs to a default structure based on "pair-wise
         % input"
