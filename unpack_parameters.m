@@ -24,13 +24,13 @@ function [] = unpack_parameters(desiredPlot, varargin)
 %   orientation:
 %       'parallel'      : slip parallel analysis
 %       'perpendicular  : slip perpendicular analysis
-%   displacement    :(optional) array with desplacements in the corresponding
-%                     order to the input files.
 %   scale           : required for 'powerVsDisp'. Also requires displcament
 %                     array to be included. Specifies the scales at which
 %                     scale the 'powerVsDisp is going to be plotted.
 %                     Interpolation is done accoding to the linear
 %                     regression model for the entire PLOMB spectrum
+%   displacement    :(optional) array with desplacements in the corresponding
+%                     order to the input files.
 %   Constraint      : Cell array specifying constraint on displacement 
 %                     ('Upper Bound' or 'Direct')
 %   parameter (with 'PowerVsDisp',orientation, displacement, scale, constraint, ...):
@@ -85,34 +85,48 @@ function [] = roughnessVsDisp(desiredPlot, inputs)
 [files, numFiles,fileIndex] = getfiles();
 
 % identify data
-orientation  = inputs{1};
-displacement = inputs{2};
-scale        = inputs{3};
 
-numIn = length(inputs);
+% default input values:
+defaultInput                = [];
+defaultInput.orientation    = 'parallel';
+defaultInput.parameter      = 'Power';
+defaultInput.wellProcssed   = repmat('yes',1,numFiles);
+defaultInput.constraint     = repmat('Direct',1,numFiles);
+defaultInput.scale          = 0.01;
 
-if numIn >= 4
-    constraint = inputs{4};
+% query info in the parameter structure of the files
+S = defaultInput;
+S.constraint                = cell(1,numFiles);
+S.displacement              = zeros(1,numFiles);
+S.wellProcessed             = cell(1,numFiles);
+
+for iFile = 1:numFiles  
+    
+    fileName            = files(fileIndex(iFile)).name;
+    load(fileName,'parameters')
+    
+    if isfield(parameters,'displacement'); S.displacement(iFile)   = parameters.displacement; end
+    if isfield(parameters,'constraint');   S.constraint{iFile}     = parameters.constraint; end
+    if isfield(parameters,'displacement'); S.wellProcessed(iFile)  = parameters.wellProcessed; end
 end
 
-if numIn >= 5
-    wellProcessed = inputs{5};
-end
+% user specified data (if done so by user)
+setVal(S,'orientation'   ,inputs);
+setVal(S,'parameter'     ,inputs);
+setVal(S,'scale'         ,inputs);
+setVal(S,'displacement'  ,inputs);
+setVal(S,'constraint'    ,inputs);
+setVal(S,'wellProcessed' ,inputs);
 
-if numIn >= 6
-    parameter = inputs{6};
-end
+% extract all the info from the strucutre now that it is set
+orientation = S.orientation;   
+parameter   = S.parameter;     
+scale       = S.scale;   
+displacement= S.displacement;
+constraint  = S.constraint;
+wellProcessed=S.wellProcessed;
 
-% additional inputs parsed into structure
-
-% default values
-S = []; % init structure
-S.magnification = 'all';
-
- % the magnification will be specified according to user specified double
- % e.g. unpack_paramaeters(...,'magnification',mag)
- % where mag is a list with desired magnifications specified by user
-S = setVal(S,'magnification',inputs)
+% create plots:
 
 % create the displacement "domain" - for line plotting
 
@@ -144,20 +158,16 @@ for iFile = 1:numFiles
     % basically continue with the same code but instead of using the
     % power we just use the Hurst exponent (the slope of the best fit
     % line through the data).
-    
-    if numIn == 6
-        if strcmp(parameter, 'Hurst')
-            Power(iFile)        = (d(1)-1)/2;
-        else strcmp(parameter, 'prefactor')
-            Power(iFile)        = d(2);
-        end
-    elseif strcmp(desiredPlot,'PowerVsDisp')
+   
+    if strcmp(parameter, 'Hurst')
+        Power(iFile)        = (d(1)-1)/2;
+    elseif strcmp(parameter, 'prefactor')
+        Power(iFile)        = d(2);
+    elseif strcmp(parameter,'Power')
         Power(iFile)        = d(1)*log10(scale) + d(2);
-        
-    % Handle the conversion to RMS as done in Brodsky et al., 2011
-    % P(lambda) = C*lambda^BETA
-     
-    elseif strcmp(desiredPlot,'RMSVsDisp')
+    elseif strcmp(desiredPlot,'RMS')
+        % Handle the conversion to RMS as done in Brodsky et al., 2011
+        % P(lambda) = C*lambda^BETA
         C = 10^d(2);
         BETA = d(1);
         RMS = (C/(BETA - 1))^0.5*scale*(BETA-1)/2;
@@ -179,36 +189,26 @@ figure
 scatter(log10(displacement),Power,40,colorSpec, 'filled')
 hold on
 xlabel('log(displacement)')
-if numIn == 6
-    ylabel(parameter)
-    title([parameter, ' as a function of displacement at ',num2str(scale),' using ', spectrumType,' - ' date])
-else
-    ylabel('log(Power)')
-    title(['Roughness as a function of displacement at ',num2str(scale),' using ', spectrumType,' - ' date])
+ylabel(parameter)
+title([parameter, ' as a function of displacement at ',num2str(scale),' using ', spectrumType,' - ' date])
+
+
+colorSpec = zeros(numFiles,3);
+noLoc = strcmp(wellProcessed, 'no');
+colorSpec = zeros(numFiles,3);
+for iFile = 1:numFiles
+    if noLoc(iFile) == 1
+        colorSpec(iFile,:) = [1 0 0];
+    end
 end
 
 % tags to the points for analysis
-
-if numIn == 5
-    noLoc = strcmp(wellProcessed, 'no');
-    colorSpec = zeros(numFiles,3);
-    for iFile = 1:numFiles
-        if noLoc(iFile) == 1
-            colorSpec(iFile,:) = [1 0 0];
-        end
-    end
-else
-    colorSpec = zeros(numFiles,3);
-end
-
 offset = 0.01;
 t = text(log10(displacement)+offset,Power+offset,fileNameArray,'interpreter', 'none');
 
 for iFile = 1:numFiles
     t(iFile).Color = colorSpec(iFile,:);
 end
-
-
 
 % Zero displacement Data ploted as lines
 for iLine = 1:length(zeroDispPower)
