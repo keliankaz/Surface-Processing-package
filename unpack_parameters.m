@@ -93,6 +93,7 @@ defaultInput.parameter      = 'Power';
 defaultInput.wellProcssed   = repmat('yes',1,numFiles);
 defaultInput.constraint     = repmat('Direct',1,numFiles);
 defaultInput.scale          = 0.01;
+defaultInput.fractalSection = 1/2;
 
 % query info in the parameter structure of the files
 S = defaultInput;
@@ -105,18 +106,27 @@ for iFile = 1:numFiles
     fileName            = files(fileIndex(iFile)).name;
     load(fileName,'parameters')
     
-    if isfield(parameters,'displacement'); S.displacement(iFile)   = parameters.displacement; end
-    if isfield(parameters,'constraint');   S.constraint{iFile}     = parameters.constraint; end
-    if isfield(parameters,'displacement'); S.wellProcessed(iFile)  = parameters.wellProcessed; end
+    if isfield(parameters,'displacement');  S.displacement(iFile)   = parameters.displacement;   end
+    if isfield(parameters,'constraint');    S.constraint{iFile}     = parameters.constraint;     end
+    if isfield(parameters,'wellProcessed'); S.wellProcessed(iFile)  = parameters.wellProcessed;  end
+    if isfield(parameters,'magnification'); S.magnification(iFile)  = parameters.magnification;  end
+    if isfield(parameters,'occular');       S.occular(iFile)        = parameters.occular;        end
+    
 end
 
-% user specified data (if done so by user)
+% user specified analysis data (if done so by user)
 setVal(S,'orientation'   ,inputs);
 setVal(S,'parameter'     ,inputs);
 setVal(S,'scale'         ,inputs);
+setVal(S,'fractalSection',inputs);
+
+% user specified scan info (if done so by user)
 setVal(S,'displacement'  ,inputs);
 setVal(S,'constraint'    ,inputs);
 setVal(S,'wellProcessed' ,inputs);
+setVal(S,'magnification' ,inputs);
+setVal(S,'occular'       ,inputs);
+
 
 % extract all the info from the strucutre now that it is set
 orientation = S.orientation;   
@@ -142,9 +152,9 @@ for iFile = 1:numFiles
     
     fileName            = files(fileIndex(iFile)).name;
     load(fileName,'parameters')
-    fileNameArray{1,iFile} = getfield(parameters,'fileName');
+    fileNameArray{1,iFile} = parameters.fileName;
     spectrumType        = 'FFT';
-    desiredData         = getfield(getfield(parameters, orientation),spectrumType);
+    desiredData         = parameters.(orientation).(spectrumType);
     fx                  = desiredData{1,1};
     Px                  = desiredData{1,2};
     Px                  = Px(1:length(fx));
@@ -159,13 +169,10 @@ for iFile = 1:numFiles
     % power we just use the Hurst exponent (the slope of the best fit
     % line through the data).
    
-    if strcmp(parameter, 'Hurst')
-        Power(iFile)        = (d(1)-1)/2;
-    elseif strcmp(parameter, 'prefactor')
-        Power(iFile)        = d(2);
-    elseif strcmp(parameter,'Power')
-        Power(iFile)        = d(1)*log10(scale) + d(2);
-    elseif strcmp(desiredPlot,'RMS')
+    if      strcmp(parameter,'Hurst');          Power(iFile)= (d(1)-1)/2;
+    elseif  strcmp(parameter,'prefactor');      Power(iFile)= d(2);
+    elseif  strcmp(parameter,'Power');          Power(iFile)= d(1)*log10(scale) + d(2);
+    elseif  strcmp(parameter,'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
         C = 10^d(2);
@@ -193,9 +200,10 @@ ylabel(parameter)
 title([parameter, ' as a function of displacement at ',num2str(scale),' using ', spectrumType,' - ' date])
 
 
-colorSpec = zeros(numFiles,3);
-noLoc = strcmp(wellProcessed, 'no');
-colorSpec = zeros(numFiles,3);
+colorSpec   = zeros(numFiles,3);
+noLoc       = strcmp(wellProcessed, 'no');
+colorSpec   = zeros(numFiles,3);
+
 for iFile = 1:numFiles
     if noLoc(iFile) == 1
         colorSpec(iFile,:) = [1 0 0];
@@ -220,6 +228,8 @@ goodInd   = ~nanInd & ~zeroInd;
 goodData  = displacement(goodInd)';
 goodPower = Power(goodInd);
 
+if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
+
 % pass a best fit line through the entire dataset
 d = polyfit(log10(goodData),goodPower,1);
 plot(log10(minmaxD),(d(1)*log10(minmaxD) + d(2)));
@@ -229,6 +239,8 @@ constrainedInd = strcmp(constraint,'Direct');
 goodInd   = constrainedInd & ~zeroInd;
 goodData  = displacement(goodInd)';
 goodPower = Power(goodInd);
+
+if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
 d = polyfit(log10(goodData),goodPower,1);
