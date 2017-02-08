@@ -19,6 +19,8 @@ function [] = unpack_parameters(desiredPlot, varargin)
 %                     the specified file 'fileName'
 %   'Best Fits'     : best logarythmic fits to power spectra obtained from
 %                     FFT
+%   'hurstVsPrefactor': correlation between best fit hurst exponent and
+%                     prefactor
 
 % varargin:
 %   orientation:
@@ -42,7 +44,12 @@ function [] = unpack_parameters(desiredPlot, varargin)
 %   pair-wise inputs:
 %       'magnification',mag: specifier magnification followed by the
 %                            desired magnification
-
+%       'occular', occular:  "                                                     
+%                                                 "
+%       'subset',{specifier,subsets}: choose only a subset of all scans
+%                                     based on a field characteristic or
+%                                     value (e.g. ...,'subset',{magnification,
+%                                     [10,20]},...)
 
 
 % User will be prompted to navigate to the directory in which the surface
@@ -58,16 +65,11 @@ function [] = unpack_parameters(desiredPlot, varargin)
 
 %% roughness at a given scale as a function of displacement
 
-inputs = varargin;
-
-if  strcmp(desiredPlot,'PowerVsDisp') || strcmp(desiredPlot,'RMSVsDisp')
-    roughnessVsDisp(desiredPlot, inputs) 
-else 
-    if strcmp(desiredPlot, 'Grids')
-        plotgrid(inputs)
-    else
-        plotspectra(desiredPlot, inputs)
-    end 
+if      strcmp(desiredPlot,'PowerVsDisp'        )... 
+     || strcmp(desiredPlot,'RMSVsDisp'          ); roughnessVsDisp(varargin); 
+elseif  strcmp(desiredPlot,'Grids'              ); plotgrid(varargin);
+elseif  strcmp(desiredPlot,'hurstVsPrefactor'   ); hurstVsPrefactor(varargin);
+else                                               plotspectra(desiredPlot, varargin)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% save plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -78,55 +80,12 @@ end
 
 end
 
-
 %% plot a metric of roughness vs displacement
-function [] = roughnessVsDisp(desiredPlot, inputs)
+function [] = roughnessVsDisp(inputs)
 
+% create a working structure with user info and default settings
 [files, numFiles,fileIndex] = getfiles();
-
-% identify data
-
-% default input values:
-defaultInput                = [];
-defaultInput.orientation    = 'parallel';
-defaultInput.parameter      = 'Power';
-defaultInput.wellProcssed   = repmat('yes',1,numFiles);
-defaultInput.constraint     = repmat('Direct',1,numFiles);
-defaultInput.scale          = 0.01;
-defaultInput.fractalSection = 1/2;
-
-% query info in the parameter structure of the files
-S = defaultInput;
-S.constraint                = cell(1,numFiles);
-S.displacement              = zeros(1,numFiles);
-S.wellProcessed             = cell(1,numFiles);
-
-for iFile = 1:numFiles  
-    
-    fileName            = files(fileIndex(iFile)).name;
-    load(fileName,'parameters')
-    
-    if isfield(parameters,'displacement');  S.displacement(iFile)   = parameters.displacement;   end
-    if isfield(parameters,'constraint');    S.constraint{iFile}     = parameters.constraint;     end
-    if isfield(parameters,'wellProcessed'); S.wellProcessed(iFile)  = parameters.wellProcessed;  end
-    if isfield(parameters,'magnification'); S.magnification(iFile)  = parameters.magnification;  end
-    if isfield(parameters,'occular');       S.occular(iFile)        = parameters.occular;        end
-    
-end
-
-% user specified analysis data (if done so by user)
-setVal(S,'orientation'   ,inputs);
-setVal(S,'parameter'     ,inputs);
-setVal(S,'scale'         ,inputs);
-setVal(S,'fractalSection',inputs);
-
-% user specified scan info (if done so by user)
-setVal(S,'displacement'  ,inputs);
-setVal(S,'constraint'    ,inputs);
-setVal(S,'wellProcessed' ,inputs);
-setVal(S,'magnification' ,inputs);
-setVal(S,'occular'       ,inputs);
-
+[S,subsetLoc,numFiles]= parseInput(inputs,files,numFiles,fileIndex); 
 
 % extract all the info from the strucutre now that it is set
 orientation = S.orientation;   
@@ -149,10 +108,14 @@ colorSpec   = zeros(numFiles,3);
 fileNameArray = cell(1,numFiles);
 
 for iFile = 1:numFiles
+    % run over the subset of files (default is all of them)
     
-    fileName            = files(fileIndex(iFile)).name;
+    % get the file and load it
+    fileName            = files(fileIndex(subsetLoc(iFile))).name;
     load(fileName,'parameters')
     fileNameArray{1,iFile} = parameters.fileName;
+    
+    % get the roughness data
     spectrumType        = 'FFT';
     desiredData         = parameters.(orientation).(spectrumType);
     fx                  = desiredData{1,1};
@@ -162,13 +125,14 @@ for iFile = 1:numFiles
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
     
-    d                   = makebestfit(fx,Px,'FitMethod','section');
+    % fi
+    d                   = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
     
-    % this is a bit awkward but fuckit im tired (if nargin is 7 we
-    % basically continue with the same code but instead of using the
-    % power we just use the Hurst exponent (the slope of the best fit
-    % line through the data).
-   
+    % this is a bit awkward but fuckit im tired (we basically continue
+    % with the same code but instead of using the power we just use the
+    % parameter specified by the input exponent (the slope of the best
+    % fit line through the data).
+    
     if      strcmp(parameter,'Hurst');          Power(iFile)= (d(1)-1)/2;
     elseif  strcmp(parameter,'prefactor');      Power(iFile)= d(2);
     elseif  strcmp(parameter,'Power');          Power(iFile)= d(1)*log10(scale) + d(2);
@@ -192,15 +156,15 @@ end
 zeroInd             = displacement == 0;
 zeroDispPower       = Power(zeroInd);
 
+pointSize = 40;
+
 figure
-scatter(log10(displacement),Power,40,colorSpec, 'filled')
+scatter(log10(displacement),Power,pointSize,colorSpec, 'filled')
 hold on
 xlabel('log(displacement)')
 ylabel(parameter)
 title([parameter, ' as a function of displacement at ',num2str(scale),' using ', spectrumType,' - ' date])
 
-
-colorSpec   = zeros(numFiles,3);
 noLoc       = strcmp(wellProcessed, 'no');
 colorSpec   = zeros(numFiles,3);
 
@@ -212,7 +176,8 @@ end
 
 % tags to the points for analysis
 offset = 0.01;
-t = text(log10(displacement)+offset,Power+offset,fileNameArray,'interpreter', 'none');
+t = text(log10(displacement)+offset,Power+offset,fileNameArray,...
+         'interpreter', 'none');
 
 for iFile = 1:numFiles
     t(iFile).Color = colorSpec(iFile,:);
@@ -247,6 +212,71 @@ d = polyfit(log10(goodData),goodPower,1);
 plot(log10(minmaxD),(d(1)*log10(minmaxD) + d(2)), 'Linewidth',2);
 
 hold off
+end
+
+%% plot Hurst Exponent as a function of Prefactor
+    function [] = hurstVsPrefactor(inputs)
+    % plots the hurst exponent as a function of theprefacto with the
+    % specific intention to extract correlation between these two...
+    
+% create a working structure with user info and default settings
+[files, numFiles,fileIndex] = getfiles();    
+[S,subsetLoc,numFiles]   = parseInput(inputs,files,numFiles,fileIndex);
+
+orientation = S.orientation;
+
+% added functonality commented out for the moemen (not completed)
+% parameter   = S.parameter;     
+% scale       = S.scale;   
+% displacement= S.displacement;
+% constraint  = S.constraint;
+% wellProcessed=S.wellProcessed;
+
+hurst       = zeros(1,numFiles);
+prefactor   = zeros(1,numFiles);
+
+for iFile = 1:numFiles
+    % get the file and load it
+    fileName            = files(fileIndex(subsetLoc(iFile))).name;
+    load(fileName,'parameters')
+    
+    % fileNameArray{1,iFile} = parameters.fileName;
+    
+    % get the roughness data
+    spectrumType        = 'FFT';
+    desiredData         = parameters.(orientation).(spectrumType);
+    fx                  = desiredData{1,1};
+    Px                  = desiredData{1,2};
+    Px                  = Px(1:length(fx));
+    PxNanInd            = isnan(Px);
+    fx                  = fx(~PxNanInd);
+    Px                  = Px(~PxNanInd);
+    
+    % get the fit
+    d                   = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    
+    hurst(iFile)        = d(1)/2-1;
+    prefactor(iFile)    = d(2);
+end
+
+% a lot more functionality could be added here...
+
+% make the plot
+
+figure
+scatter(prefactor,hurst)
+title('Correlation between Hurst exponent and Pre-factor')
+xlabel('Prefactor')
+ylabel('Hurst Exponent')
+hold on
+
+% % tags to the points for analysis
+% offset = 0.01;
+% text(prefactor + offset, husrt+offset,fileNameArray,...
+%      'interpreter', 'none');
+     
+hold off
+
 end
 
 %% plot a specific, or many, grids (surfaces)
@@ -285,125 +315,125 @@ end
 %% plot all the frequency spectra in a given file
     function [] = plotspectra(desiredPlot,inputs)
         
-        [files, numFiles,fileIndex] = getfiles();
+    [files, numFiles,fileIndex] = getfiles();
+    
+    legendArray = cell(1,numFiles);
+    orientation = inputs{1};
+    hold on
+    
+    if length(inputs) >= 2
+        displacement = inputs{2};
+        D = displacement;
+        minD = min(D(D~=0));
+        maxD = max(D);
+        logMinD = log10(minD);
+        logMaxD = log10(maxD);
+        logDelD = logMaxD-logMinD;
         
-        legendArray = cell(1,numFiles);
-        orientation = inputs{1};
-        hold on
+    end
+    
+    if length(inputs) >=3
+        constraint = inputs{3};
+    end
+    
+    % loop over files
+    for iFile = 1:numFiles
+        fileName            = files(fileIndex(iFile)).name;
+        load(fileName)
         
-        if length(inputs) >= 2
-            displacement = inputs{2};
-            D = displacement;
-            minD = min(D(D~=0));
-            maxD = max(D);
-            logMinD = log10(minD);
-            logMaxD = log10(maxD);
-            logDelD = logMaxD-logMinD;
+        if strcmp(desiredPlot,'best fits')
+            desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
+            desiredCell     = desiredStruct;
             
-        end
-        
-        if length(inputs) >=3
-            constraint = inputs{3};
-        end
-        
-        % loop over files
-        for iFile = 1:numFiles
-            fileName            = files(fileIndex(iFile)).name;
-            load(fileName)
+            wavelength      = 1./desiredCell{1};
+            power           = desiredCell{2};
             
-            if strcmp(desiredPlot,'best fits')
-                desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
+            power           = power(1:length(wavelength));
+            nanInd          = isnan(power);
+            power           = power(~nanInd);
+            wavelength      = wavelength(~nanInd);
+            
+            d               = polyfit(log10(wavelength'),log10(power),1);
+            x               = [min(wavelength),max(wavelength)];
+            y               = 10.^(d(1)*log10(x)+d(2));
+            
+        else
+            desiredStruct   = getfield(getfield(parameters, orientation),desiredPlot);
+            
+            % decide what plot to do (enable plot-specific attributes)
+            if strcmp(desiredPlot,'FFT') || strcmp(desiredPlot,'PLOMB')
                 desiredCell     = desiredStruct;
-                
-                wavelength      = 1./desiredCell{1};
-                power           = desiredCell{2};
-                
-                power           = power(1:length(wavelength));
-                nanInd          = isnan(power);
-                power           = power(~nanInd);
-                wavelength      = wavelength(~nanInd);
-                
-                d               = polyfit(log10(wavelength'),log10(power),1);
-                x               = [min(wavelength),max(wavelength)];
-                y               = 10.^(d(1)*log10(x)+d(2));
+                x               = desiredCell{1};
+                x               = 1./x;
+                y               = desiredCell{2};
+                y               = y(1:length(x));
                 
             else
-                desiredStruct   = getfield(getfield(parameters, orientation),desiredPlot);
-                
-                % decide what plot to do (enable plot-specific attributes)
-                if strcmp(desiredPlot,'FFT') || strcmp(desiredPlot,'PLOMB')
-                    desiredCell     = desiredStruct;
-                    x               = desiredCell{1};
-                    x               = 1./x;
-                    y               = desiredCell{2};
-                    y               = y(1:length(x));
-                    
+                x               = getfield(getfield(parameters, orientation),'Scales');
+                if strcmp(desiredPlot, 'avgAsyms')
+                    badInd          = isnan(desiredStruct)|desiredStruct == 0;
+                    y               = abs(desiredStruct(~badInd));
+                    x               = x(~badInd);
                 else
-                    x               = getfield(getfield(parameters, orientation),'Scales');
-                    if strcmp(desiredPlot, 'avgAsyms')
-                        badInd          = isnan(desiredStruct)|desiredStruct == 0;
-                        y               = abs(desiredStruct(~badInd));
-                        x               = x(~badInd);
-                    else
-                        y               = desiredStruct;
-                        y               = y(y~=0);
-                        x               = x(y~=0);
-                    end
-                    
-                end
-            end
-            
-            scanName = getfield(parameters,'fileName');
-            
-            % create the plots
-            if length(inputs) == 1
-                plot(x,y,'.-')
-                legendArray{1,iFile} = fileName;
-                
-            elseif length(inputs) >= 2
-                % set color as a function of displacement
-                if D(iFile) == 0
-                    colorForDisp = [0 1 0];
-                else
-                    colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
-                    colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
+                    y               = desiredStruct;
+                    y               = y(y~=0);
+                    x               = x(y~=0);
                 end
                 
-                % set unknow displacements to grey
-                if sum(isnan(colorForDisp)) ~= 0
-                    colorForDisp = [0.5, 0.5, 0.5];
-                end
-                
-                p = plot(x,y,'-');
-                p.Color = colorForDisp;
-                formatSpec = 'D = %d - file: %s';
-                legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
-                    scanName);
-                xlabel('Scale (m)')
-            end
-            
-            % to help distinguish points whith various constraints on displacement
-            if length(inputs) >=3
-                if strcmp(constraint{iFile}, 'Direct')
-                    p.LineWidth = 3;
-                elseif strcmp(constraint{iFile},'Upper Bound')
-                    p.LineWidth = 0.2;
-                end
-            end
-            
-            
-            ylabel(desiredPlot)
-            title([desiredPlot,' as a function of scale - ', orientation, date])
-            
-            if strcmp(desiredPlot,'topostd') || strcmp(desiredPlot,'FFT')|| ...
-                    strcmp(desiredPlot,'PLOMB')
-                set(gca,'XScale','log','YScale','log')
-                xlabel('Scale (log(m))')
             end
         end
         
-        legend(legendArray,'interpreter', 'none')
+        scanName = getfield(parameters,'fileName');
         
+        % create the plots
+        if length(inputs) == 1
+            plot(x,y,'.-')
+            legendArray{1,iFile} = fileName;
+            
+        elseif length(inputs) >= 2
+            % set color as a function of displacement
+            if D(iFile) == 0
+                colorForDisp = [0 1 0];
+            else
+                colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
+                colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
+            end
+            
+            % set unknow displacements to grey
+            if sum(isnan(colorForDisp)) ~= 0
+                colorForDisp = [0.5, 0.5, 0.5];
+            end
+            
+            p = plot(x,y,'-');
+            p.Color = colorForDisp;
+            formatSpec = 'D = %d - file: %s';
+            legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
+                scanName);
+            xlabel('Scale (m)')
+        end
+        
+        % to help distinguish points whith various constraints on displacement
+        if length(inputs) >=3
+            if strcmp(constraint{iFile}, 'Direct')
+                p.LineWidth = 3;
+            elseif strcmp(constraint{iFile},'Upper Bound')
+                p.LineWidth = 0.2;
+            end
+        end
+        
+        
+        ylabel(desiredPlot)
+        title([desiredPlot,' as a function of scale - ', orientation, date])
+        
+        if strcmp(desiredPlot,'topostd') || strcmp(desiredPlot,'FFT')|| ...
+                strcmp(desiredPlot,'PLOMB')
+            set(gca,'XScale','log','YScale','log')
+            xlabel('Scale (log(m))')
+        end
+    end
+    
+    legend(legendArray,'interpreter', 'none')
+    
     end
 
 %% small function to query the files in the desired directory
@@ -431,13 +461,13 @@ end
         defaultStruct.FitMethod     = 'default';
         defaultStruct.SectionVal    = 2/3;
         
-        % adapt defualt structure
+        % adapt default structure
         input = varargin;
         defaultStruct = setVal(defaultStruct,'FitMethod',input);
         defaultStruct = setVal(defaultStruct,'SectionVal',input);
         
         S = defaultStruct;
-        
+  
         if strcmp(S.FitMethod, 'default')
             % Simplest form: take the fit over the entire calculated spectrum:
             d           = polyfit(log10(1./F),log10(P),1);
@@ -451,7 +481,7 @@ end
             % should not be affected by instrumental artefacts
             
             numIn       = length(F);
-            numEntries  = ceil(numIn*S.SectionVal);
+            numEntries  = ceil(numIn*S.SectionVal)-1;
             start       = numIn-numEntries;
             newF        = F(start:end);
             newP        = P(start:end);
@@ -464,15 +494,107 @@ end
         end
     end
 
-%% input parsing function    
+%% input parsing functions (if you want to add input options here is the place)
+    function [S, SUBSETLOC, NUMFILES] = parseInput(inputs, files, numFiles, fileIndex)
+
+% identify data
+
+% possible inputs
+scanInputInfo = {'displacement', ...
+                 'constraint', ...
+                 'wellProcessed',...
+                 'magnification',...
+                 'occular'};
+numScanInfo   = length(scanInputInfo);
+             
+userInput     = {'orientation',...
+                 'parameter',...
+                 'scale',...
+                 'fractalSection',...
+                 'subset'};
+numUserInput  = length(userInput);
+
+for iInput = 1:2:length(inputs)
+    if ~any([strcmp(inputs(1,iInput),scanInputInfo), ...
+             strcmp(inputs(1,iInput),userInput)]);
+             
+        error(['input number ',inputs(1,iInput),' not allowed'])
+    end
+end
+
+% default input values:
+defaultInput                = [];
+defaultInput.orientation    = 'parallel';
+defaultInput.parameter      = 'Power';
+defaultInput.wellProcssed   = repmat('yes',1,numFiles);
+defaultInput.constraint     = repmat('Direct',1,numFiles);
+defaultInput.scale          = 0.01;
+defaultInput.fractalSection = 1/2;
+
+% query info in the parameter structure of the files
+
+% init arrays
+S = defaultInput;
+S.constraint                = cell(1,numFiles);
+S.displacement              = zeros(1,numFiles);
+S.wellProcessed             = cell(1,numFiles);
+S.magnification             = zeros(1,numFiles);
+S.occular                   = zeros(1,numFiles);
+
+for iFile = 1:numFiles  
+    
+    fileName            = files(fileIndex(iFile)).name;
+    load(fileName,'parameters')
+    
+    % query fields if they exist
+    for iInput = 1:numScanInfo
+        f = char(scanInputInfo(1,iInput));
+        if isfield(parameters,f);
+            if isa(parameters.(f), 'char')
+                S.(f){1,iFile}   = ...
+                parameters.(f);   
+            elseif isa(parameters.(f), 'double')
+                S.(f)(1,iFile)   = ...
+                parameters.(f); 
+            else
+                error('unrecognized variable type, must be cell or double')
+            end
+        end
+    end
+end
+
+% user specified analysis data (if done so by user)
+for iInput = 1:numUserInput;
+    S       = setVal(S,userInput(1,iInput),inputs);
+end
+
+% user specified scan info (if done so by user)
+for iInput = 1:numScanInfo
+    S       = setVal(S,scanInputInfo(1,iInput),inputs);
+end
+
+% select a subset of the files based on a parameter:
+if isfield(S,'subset')
+    subsetInd   = S.(S.subset{1,1}) == S.subset{1,2};
+else 
+    subsetInd   = ones(1,numFiles); 
+end
+SUBSETLOC   = find(subsetInd);
+NUMFILES    = sum(subsetInd);
+
+for iScanInfo = 1:numScanInfo          
+    S.(scanInputInfo{1,iScanInfo}) = S.(scanInputInfo{1,iScanInfo})(1,subsetInd);
+end
+   
+    end
     function S = setVal(S, name, input)
         % set user specified inputs to a default structure based on "pair-wise
         % input"
         ind = strcmp(name, input);
+        name = char(name);
         if any(ind)
-            S.(name) = input{1,ind+1};
+            S.(name) = input{find(ind)+1};
         end
     end
 
-        
     
