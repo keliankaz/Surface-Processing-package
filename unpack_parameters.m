@@ -69,7 +69,7 @@ if      strcmp(desiredPlot,'PowerVsDisp'        )...
      || strcmp(desiredPlot,'RMSVsDisp'          ); roughnessVsDisp(varargin); 
 elseif  strcmp(desiredPlot,'Grids'              ); plotgrid(varargin);
 elseif  strcmp(desiredPlot,'hurstVsPrefactor'   ); hurstVsPrefactor(varargin);
-else                                               plotspectra(desiredPlot, varargin)
+else                                             ; plotspectra(desiredPlot, varargin)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% save plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -81,7 +81,7 @@ end
 end
 
 %% plot a metric of roughness vs displacement
-function [] = roughnessVsDisp(inputs)
+    function [] = roughnessVsDisp(inputs)
 
 % create a working structure with user info and default settings
 [files, numFiles,fileIndex] = getfiles();
@@ -126,23 +126,22 @@ for iFile = 1:numFiles
     Px                  = Px(~PxNanInd);
     
     % fi
-    d                   = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    [C,H]               = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
     
     % this is a bit awkward but fuckit im tired (we basically continue
     % with the same code but instead of using the power we just use the
     % parameter specified by the input exponent (the slope of the best
     % fit line through the data).
     
-    if      strcmp(parameter,'Hurst');          Power(iFile)= (d(1)-1)/2;
-    elseif  strcmp(parameter,'prefactor');      Power(iFile)= d(2);
-    elseif  strcmp(parameter,'Power');          Power(iFile)= d(1)*log10(scale) + d(2);
+    if      strcmp(parameter,'Hurst');          Power(iFile)= H;
+    elseif  strcmp(parameter,'prefactor');      Power(iFile)= C;
+    elseif  strcmp(parameter,'Power');          Power(iFile)= fractalfit(1/scale,C,H);
     elseif  strcmp(parameter,'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
-        C = 10^d(2);
-        BETA = d(1);
+        BETA = 1+2*H;
         RMS = (C/(BETA - 1))^0.5*scale*(BETA-1)/2;
-        Power(iFile) = log10(RMS); %... for the purpose of plotting...
+        Power(iFile) = RMS; %... for the purpose of plotting...
     end
     
     % identify constraints on data points
@@ -159,7 +158,7 @@ zeroDispPower       = Power(zeroInd);
 pointSize = 40;
 
 figure
-scatter(log10(displacement),Power,pointSize,colorSpec, 'filled')
+scatter(displacement,Power,pointSize,colorSpec, 'filled')
 hold on
 xlabel('log(displacement)')
 ylabel(parameter)
@@ -175,8 +174,8 @@ for iFile = 1:numFiles
 end
 
 % tags to the points for analysis
-offset = 0.01;
-t = text(log10(displacement)+offset,Power+offset,fileNameArray,...
+offset = 1.1;
+t = text(displacement*offset,Power*offset,fileNameArray,...
          'interpreter', 'none');
 
 for iFile = 1:numFiles
@@ -235,29 +234,43 @@ orientation = S.orientation;
 hurst       = zeros(1,numFiles);
 prefactor   = zeros(1,numFiles);
 
+figure
+hold on
+fileNameArray           = cell(1,numFiles);
+
 for iFile = 1:numFiles
     % get the file and load it
     fileName            = files(fileIndex(subsetLoc(iFile))).name;
     load(fileName,'parameters')
     
-    % fileNameArray{1,iFile} = parameters.fileName;
+     fileNameArray{1,iFile} = parameters.fileName;
     
     % get the roughness data
     spectrumType        = 'FFT';
     desiredData         = parameters.(orientation).(spectrumType);
-    fx                  = desiredData{1,1};
+    fx                  = desiredData{1};
     Px                  = desiredData{1,2};
     Px                  = Px(1:length(fx));
     PxNanInd            = isnan(Px);
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
     
-    % get the fit
-    d                   = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    plot(fx,Px,'b')
     
-    hurst(iFile)        = d(1)/2-1;
-    prefactor(iFile)    = d(2);
+    % get the fit
+    [C,H]               = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    
+    hurst(iFile)        = H;
+    prefactor(iFile)    = C;
+    
+    dataFit = C*fx.^(-1-2*H);
+    plot(fx,dataFit, 'r')
+    
+    
 end
+
+ax = gca;
+set(ax,'XScale', 'log', 'YScale', 'log')
 
 % a lot more functionality could be added here...
 
@@ -270,12 +283,14 @@ xlabel('Prefactor')
 ylabel('Hurst Exponent')
 hold on
 
-% % tags to the points for analysis
-% offset = 0.01;
-% text(prefactor + offset, husrt+offset,fileNameArray,...
-%      'interpreter', 'none');
+% tags to the points for analysis
+offset = 1.5;
+text(prefactor * offset, hurst,fileNameArray,...
+     'interpreter', 'none');
      
 hold off
+ax = gca;
+set(ax,'XScale', 'log', 'YScale', 'log')
 
 end
 
@@ -286,7 +301,7 @@ end
         numGrid  = length(desiredFileNameArray);
         subplotCount = 0;
         
-        for iGrid = 1:numGrid;
+        for iGrid = 1:numGrid
             
             load(desiredFileNameArray{iGrid})
             originalGrid = getfield(parameters,'zGrid');
@@ -312,7 +327,7 @@ end
         end
     end
 
-%% plot all the frequency spectra in a given file
+%% plot all the frequency spectra in a given directory
     function [] = plotspectra(desiredPlot,inputs)
         
     [files, numFiles,fileIndex] = getfiles();
@@ -448,29 +463,46 @@ end
     end
 
 %% best fit the spectra while not letting instrument artefact affect results
-    function [d] = makebestfit(F,P,varargin)
+    function [C,H] = makebestfit(F,P,varargin)
         % small function to make the best fit of the power spectrum
         %
         %     % ensure the vectors are of the same size/dimension
         %     if length(F) == length(P)
-        if size(F) ~= size(P)
-            P = P';
+        
+        % possible inputs
+        inputList                   = {'FitMethod',... % to fit the data
+                                       'sectionVal',...% section to be fit (0 to 1)
+                                       'avgWindow',... % moving average windoe
+                                       'smoothing',... % smooth data ('yes'/'no')
+                                       'rolloff'};     % starting point of the section
+                                   
+        numInputList                = length(inputList);
+        
+        % make default setting ( caution, values inputed into function
+        % override these values )
+        defaultStruct.FitMethod     = 'section';
+        defaultStruct.SectionVal    = 0.2;
+        defaultStruct.avgWindow     = 11;
+        defaultStruct.smoothing     = 'yes';
+        defaultStruct.rolloff       = 10;       
+        
+        userSpec                    = varargin;
+        
+        % user specified inputs
+        for iInput = 1:numInputList
+            defaultStruct = setVal(defaultStruct,inputList(1,iInput),userSpec);
         end
         
-        % make default setting
-        defaultStruct.FitMethod     = 'default';
-        defaultStruct.SectionVal    = 2/3;
+        % working structure - 
+        S           = defaultStruct;
         
-        % adapt default structure
-        input = varargin;
-        defaultStruct = setVal(defaultStruct,'FitMethod',input);
-        defaultStruct = setVal(defaultStruct,'SectionVal',input);
+        if size(F) ~= size(P);          P = P';                     end
+        if strcmp(S.smoothing, 'yes');  P = movmean(P,S.avgWindow); end
         
-        S = defaultStruct;
-  
         if strcmp(S.FitMethod, 'default')
             % Simplest form: take the fit over the entire calculated spectrum:
-            d           = polyfit(log10(1./F),log10(P),1);
+            f           = F;
+            p           = P;
             
         elseif strcmp(S.FitMethod, 'section')
             % Uninspired, but better form: take the best fit only on a
@@ -482,18 +514,22 @@ end
             
             numIn       = length(F);
             numEntries  = ceil(numIn*S.SectionVal)-1;
-            start       = numIn-numEntries;
-            newF        = F(start:end);
-            newP        = P(start:end);
             
-            d           = polyfit(log10(1./newF),log10(newP),1);
-            
-            
+            f           = F(10:numEntries);
+            p           = P(10:numEntries);
+
         else
             disp('error in the code making the best fit, input vectors must be the same length')
         end
+            fitObj      = fit(f,p,'power1');
+            C           = fitObj.a;
+            BETA        = fitObj.b;
+            H           = (BETA+1)/-2;
+
+            plot(f,p,'g')
     end
 
+    
 %% input parsing functions (if you want to add input options here is the place)
     function [S, SUBSETLOC, NUMFILES] = parseInput(inputs, files, numFiles, fileIndex)
 
@@ -516,8 +552,7 @@ numUserInput  = length(userInput);
 
 for iInput = 1:2:length(inputs)
     if ~any([strcmp(inputs(1,iInput),scanInputInfo), ...
-             strcmp(inputs(1,iInput),userInput)]);
-             
+             strcmp(inputs(1,iInput),userInput)])    
         error(['input number ',inputs(1,iInput),' not allowed'])
     end
 end
@@ -529,7 +564,7 @@ defaultInput.parameter      = 'Power';
 defaultInput.wellProcssed   = repmat('yes',1,numFiles);
 defaultInput.constraint     = repmat('Direct',1,numFiles);
 defaultInput.scale          = 0.01;
-defaultInput.fractalSection = 1/2;
+defaultInput.fractalSection = 0.03;
 
 % query info in the parameter structure of the files
 
@@ -549,7 +584,7 @@ for iFile = 1:numFiles
     % query fields if they exist
     for iInput = 1:numScanInfo
         f = char(scanInputInfo(1,iInput));
-        if isfield(parameters,f);
+        if isfield(parameters,f)
             if isa(parameters.(f), 'char')
                 S.(f){1,iFile}   = ...
                 parameters.(f);   
@@ -564,7 +599,7 @@ for iFile = 1:numFiles
 end
 
 % user specified analysis data (if done so by user)
-for iInput = 1:numUserInput;
+for iInput = 1:numUserInput
     S       = setVal(S,userInput(1,iInput),inputs);
 end
 
@@ -587,13 +622,13 @@ for iScanInfo = 1:numScanInfo
 end
    
     end
-    function S = setVal(S, name, input)
+        function S = setVal(S, name, input)
         % set user specified inputs to a default structure based on "pair-wise
         % input"
         ind = strcmp(name, input);
         name = char(name);
         if any(ind)
-            S.(name) = input{find(ind)+1};
+            S.(name) = input{find(ind)+1}
         end
     end
 
