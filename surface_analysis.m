@@ -15,7 +15,7 @@ parameterStruct     = surface_parameters(surfaceGrid, pointSpacing, ...
                                          numberOfScales);
 end                       
 
-% run surface fft analysis (with default decimation factor = 20)
+% run surface fft analysis (with default decimation factor = 1)
 
 if strcmp(decimationFactor,'default')
     decimationFactor = 1;

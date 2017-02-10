@@ -38,21 +38,21 @@ NoiseLevel=8*std(Z2);
 % set minimum length of row or column for which power will be estimated
 Nmin=10;
 
-for i=1:Nx,
+for i=1:Nx
     
     z=Z(i,:)';
     Iz=find(isfinite(z)); 
     
-    if (length(Iz)>Nmin),       
+    if (length(Iz)>Nmin)      
         Iz1=Iz(1);
         Iz2=Iz(end);
         zfinite=z(Iz1:Iz2); %trim to the actual data
         Iz=find(isnan(zfinite));
         Iz=[1 Iz' length(zfinite)]';
         
-        for isegment=1:length(Iz)-1,   
+        for isegment=1:length(Iz)-1   
             z=zfinite(Iz(isegment):Iz(isegment+1)-1);
-            if (length(z)>Nmin),
+            if (length(z)>Nmin)
                 [p,f]=powerspect(z,dx,NoiseLevel);
             else
                 p=[NaN NaN];

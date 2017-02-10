@@ -135,7 +135,7 @@ for iFile = 1:numFiles
     
     if      strcmp(parameter,'Hurst');          Power(iFile)= H;
     elseif  strcmp(parameter,'prefactor');      Power(iFile)= C;
-    elseif  strcmp(parameter,'Power');          Power(iFile)= fractalfit(1/scale,C,H);
+    elseif  strcmp(parameter,'Power');          Power(iFile)= C*(1/scale)^(-1-2*H);
     elseif  strcmp(parameter,'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
@@ -162,7 +162,7 @@ scatter(displacement,Power,pointSize,colorSpec, 'filled')
 hold on
 xlabel('log(displacement)')
 ylabel(parameter)
-title([parameter, ' as a function of displacement at ',num2str(scale),' using ', spectrumType,' - ' date])
+title([parameter, ' as a function of displacement at ',num2str(scale),'m using ', spectrumType,' - ' date])
 
 noLoc       = strcmp(wellProcessed, 'no');
 colorSpec   = zeros(numFiles,3);
@@ -175,7 +175,7 @@ end
 
 % tags to the points for analysis
 offset = 1.1;
-t = text(displacement*offset,Power*offset,fileNameArray,...
+t = text(displacement*offset,Power,fileNameArray,...
          'interpreter', 'none');
 
 for iFile = 1:numFiles
@@ -184,7 +184,7 @@ end
 
 % Zero displacement Data ploted as lines
 for iLine = 1:length(zeroDispPower)
-    plot(log10(minmaxD), zeroDispPower(iLine)*[1,1], 'r')
+    plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r')
 end
 
 nanInd    = isnan(displacement);
@@ -195,8 +195,8 @@ goodPower = Power(goodInd);
 if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
-d = polyfit(log10(goodData),goodPower,1);
-plot(log10(minmaxD),(d(1)*log10(minmaxD) + d(2)));
+d = fit(goodData,goodPower,'power1');
+plot(minmaxD,(d.a*minmaxD.^d.b));
 
 % pass a best fit through well constrained data
 constrainedInd = strcmp(constraint,'Direct');
@@ -207,10 +207,14 @@ goodPower = Power(goodInd);
 if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
-d = polyfit(log10(goodData),goodPower,1);
-plot(log10(minmaxD),(d(1)*log10(minmaxD) + d(2)), 'Linewidth',2);
+d = fit(goodData,goodPower,'power1');
+plot(minmaxD,(d.a*minmaxD.^d.b), 'Linewidth',2);
 
 hold off
+ax = gca;
+set(ax,'XScale','log','YScale','log')
+grid on
+
 end
 
 %% plot Hurst Exponent as a function of Prefactor
@@ -234,8 +238,6 @@ orientation = S.orientation;
 hurst       = zeros(1,numFiles);
 prefactor   = zeros(1,numFiles);
 
-figure
-hold on
 fileNameArray           = cell(1,numFiles);
 
 for iFile = 1:numFiles
@@ -268,9 +270,6 @@ for iFile = 1:numFiles
     
     
 end
-
-ax = gca;
-set(ax,'XScale', 'log', 'YScale', 'log')
 
 % a lot more functionality could be added here...
 
@@ -526,7 +525,6 @@ end
             BETA        = fitObj.b;
             H           = (BETA+1)/-2;
 
-            plot(f,p,'g')
     end
 
     
@@ -628,8 +626,8 @@ end
         ind = strcmp(name, input);
         name = char(name);
         if any(ind)
-            S.(name) = input{find(ind)+1}
+            S.(name) = input{find(ind)+1};
         end
-    end
+        end % set the structure that will be used in functions
 
     
