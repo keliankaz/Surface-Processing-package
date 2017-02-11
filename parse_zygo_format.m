@@ -8,19 +8,19 @@ function [grid, pointSpacing] = parse_zygo_format(varargin)
 % (NOTE this is detrending NOT rotating - DO NOT USE FOR VERY INCLINED
 % SURFACES!!!!)
 
+% possible vargargin
+userInput   = {'fileName', ...
+               'detrend',...
+               'infill'};
+               
+defaultStruct           = [];
+defaultStruct.detrend   = 'no';
+defaultStruct.infill    = 'yes';
 
-% process input
-ind = strcmp(varargin,'fileName');
-fileName = varargin{find(ind)+1};
-
-ind = strcmp(varargin,'detrend');
-if any(ind)
-    detrend = varargin{find(ind)+1};
-else
-    detrend = 'no'; % default is to not detrend the input data
-end 
+S = setVal(defaultStruct, userInput, varargin);
 
 delimeter = ' ';
+fileName = S.fileName{1};
 FID       = fopen(fileName);
 
 numY = dlmread(fileName,delimeter,[3 2 3 2]);
@@ -34,7 +34,7 @@ z     = z*10^-6; % convert to meters
 
 grid = reshape(z,numY,numX);
 
-if strcmp(detrend,'yes')
+if strcmp(S.detrend,'yes')
     
     % creat x-y coordinates
     xVec = 1:numX;
@@ -64,5 +64,15 @@ if strcmp(detrend,'yes')
     planeTrend = -(n(1)*(X-p(1)) + n(2)*(Y-p(2)))/n(3)+p(3); 
     grid = grid - planeTrend;
 end
+
+if strcmp(S.infill,'yes')
+   %  use a the inpaint nan inteprolation scheme with the spring metaphor
+   %  (method 4). Function from the file exchange:
+   %  https://www.mathworks.com/matlabcentral/fileexchange/4551-inpaint-nans
+   
+   grid     = inpaint_nans(grid);
+   
+end
+    
 
 end

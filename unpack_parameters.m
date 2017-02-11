@@ -620,14 +620,6 @@ for iScanInfo = 1:numScanInfo
 end
    
     end
-        function S = setVal(S, name, input)
-        % set user specified inputs to a default structure based on "pair-wise
-        % input"
-        ind = strcmp(name, input);
-        name = char(name);
-        if any(ind)
-            S.(name) = input{find(ind)+1};
-        end
-        end % set the structure that will be used in functions
+
 
     
