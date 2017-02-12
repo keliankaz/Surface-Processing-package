@@ -87,21 +87,21 @@ function [p,f,ph] = powerspect(z,dx, NoiseLevel)
     % NoiseLevel=maximum reasonable value of 2nd deriv
     N=length(z);
     
-    % check for large 2nd derivs
-    z2=diff(z,2)./dx.^2;
-    I=(abs(z2)>(4*std(abs(z2)))); % SMOOTHED ACCORDING TO TIBO
-    %I=(abs(z2)>NoiseLevel); % ORIGINAL SMOOTHING
-    
-    while (sum(I)>0)
-        
-        Iz=logical([0 I' 0]');% shift to the z equivalent
-        Ibefore=logical([I' 0 0]'); % index before
-        Iafter=logical([0 Iz(1:end-1)']'); %index after
-        z(Iz)=(z(Ibefore)+z(Iafter))/2;  
-        z2=diff(z,2)./dx.^2;
-        I=(abs(z2)>(4*std(abs(z2))));
-    end
-    
+%     % check for large 2nd derivs
+%     z2=diff(z,2)./dx.^2;
+%     I=(abs(z2)>(4*std(abs(z2)))); % SMOOTHED ACCORDING TO TIBO
+%     %I=(abs(z2)>NoiseLevel); % ORIGINAL SMOOTHING
+%     
+%     while (sum(I)>0)
+%         
+%         Iz=logical([0 I' 0]');% shift to the z equivalent
+%         Ibefore=logical([I' 0 0]'); % index before
+%         Iafter=logical([0 Iz(1:end-1)']'); %index after
+%         z(Iz)=(z(Ibefore)+z(Iafter))/2;  
+%         z2=diff(z,2)./dx.^2;
+%         I=(abs(z2)>(4*std(abs(z2))));
+%     end
+%     d
     z=z-mean(z);
     z=detrend(z);
     z=taper(z,0.05,0.05); 

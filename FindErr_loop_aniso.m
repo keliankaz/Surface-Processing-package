@@ -54,6 +54,18 @@ end
 
 Pxi = Pxi(1:index);
 Px = nanmean(Pxi);
+
+% take the mode of the data
+% NTotal = ceil(sqrt(sum(~isnan(Pxi))));
+% if NTotal ~= 0
+%     [N,edges] = histcounts(log10(Pxi),NTotal);
+%     modeInd = find(N == max(N));
+%     modeInd = modeInd(1);
+%     Px = 10^((edges(modeInd)+edges(modeInd+1))/2);    
+% else
+%     Px = nan;
+% end
+
 Errx = nanstd(Pxi);
 
-end 
+end

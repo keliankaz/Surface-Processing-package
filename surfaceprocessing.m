@@ -65,61 +65,81 @@ disp('Nice!')
 
 %% dealing with user inputs
 
-% unit
-ind = strcmp(varargin,'unit');
-if any(ind)
-    unit = varargin{find(ind)+1};
-else
-    unit = 'm'; % meters (default)
-end 
+% possible user inputs:
 
-% to do list
-ind = strcmp(varargin,'toDo');
-if any(ind)
-    toDo = varargin{find(ind)+1};
-else
-    toDo = 'all'; % meters (default)
-end 
+userInputs      = {'unit',...
+                   'toDo',...
+                   'bypass',...
+                   'instrument',...
+                   'numberOfScales',...
+                   'decimationFactor'};
 
-% bypass skip preprocessing 'yes', 'no'
-ind = strcmp(varargin,'bypass');
-if any(ind)
-    bypass = varargin{find(ind)+1};
-else
-    bypass = 'no'; % (default)
-end 
+% default values;
+default                 = [];       % initialize structure
+default.unit            = 'm';      % meters
+default.toDo            = 'all';    % runs all analyses
+default.bypass          = 'no';     % does not by pass pre-processing step
+default.instrument      = 'default';% runs without any specific instrument preferences
+default.numberOfScales  = 'default';% the number of scals(log space analysed
+default.decimationFactor= 1;        % decimation of point cloud
 
-% instrument
-ind = strcmp(varargin,'instrument');
-if any(ind)
-    instrument = varargin{find(ind)+1};
-else
-    instrument = 'default';
-end
+S = setVal(default,userInputs,varargin);
 
-% number of scale
-ind = strcmp(varargin,'numberOfScales');
-if any(ind)
-    numberOfScales = varargin{find(ind)+1};
-else
-    numberOfScales = 'default'; % default is ten scales
-end 
-
-% decimation factor
-ind = strcmp(varargin,'decimationFactor');
-if any(ind)
-    decimationFactor = varargin{find(ind)+1};
-else
-    decimationFactor = 'default';
-end
+% % unit
+% ind = strcmp(varargin,'unit');
+% if any(ind)
+%     unit = varargin{find(ind)+1};
+% else
+%     unit = 'm'; % meters (default)
+% end 
+% 
+% % to do list
+% ind = strcmp(varargin,'toDo');
+% if any(ind)
+%     toDo = varargin{find(ind)+1};
+% else
+%     toDo = 'all'; % meters (default)
+% end 
+% 
+% % bypass skip preprocessing 'yes', 'no'
+% ind = strcmp(varargin,'bypass');
+% if any(ind)
+%     bypass = varargin{find(ind)+1};
+% else
+%     bypass = 'no'; % (default)
+% end 
+% 
+% % instrument
+% ind = strcmp(varargin,'instrument');
+% if any(ind)
+%     instrument = varargin{find(ind)+1};
+% else
+%     instrument = 'default';
+% end
+% 
+% % number of scale
+% ind = strcmp(varargin,'numberOfScales');
+% if any(ind)
+%     numberOfScales = varargin{find(ind)+1};
+% else
+%     numberOfScales = 'default'; % default is ten scales
+% end 
+% 
+% % decimation factor
+% ind = strcmp(varargin,'decimationFactor');
+% if any(ind)
+%     decimationFactor = varargin{find(ind)+1};
+% else
+%     decimationFactor = 'default';
+% end
 
 %% process data:
 
 for iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name
-    parfor_process(fileName,unit,toDo,destination_directory, bypass, ...
-                   instrument, numberOfScales, decimationFactor);
+    parfor_process(fileName,S.unit,S.toDo,destination_directory, S.bypass, ...
+                   S.instrument, S.numberOfScales, S.decimationFactor);
     
 end
 

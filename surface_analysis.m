@@ -15,11 +15,7 @@ parameterStruct     = surface_parameters(surfaceGrid, pointSpacing, ...
                                          numberOfScales);
 end                       
 
-% run surface fft analysis (with default decimation factor = 1)
-
-if strcmp(decimationFactor,'default')
-    decimationFactor = 1;
-end
+% run surface fft analysis 
 
 if sum(strcmp(toDo,'FFT'))>=1 || strcmp(toDo,'all')
     [fx1, PowerStructx] =  frequency_spectrum(surfaceGrid, pointSpacing, ...
