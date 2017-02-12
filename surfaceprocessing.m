@@ -135,7 +135,7 @@ S = setVal(default,userInputs,varargin);
 
 %% process data:
 
-for iFile = 1:length(fileIndex)
+parfor iFile = 1:length(fileIndex)
     
     fileName            = files(fileIndex(iFile)).name
     parfor_process(fileName,S.unit,S.toDo,destination_directory, S.bypass, ...
