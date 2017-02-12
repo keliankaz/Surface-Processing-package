@@ -135,7 +135,9 @@ S = setVal(default,userInputs,varargin);
 
 %% process data:
 
-parfor iFile = 1:length(fileIndex)
+numFiles    =  length(fileIndex);
+
+parfor iFile = 1:numFiles
     tic 
     
     fileName            = files(fileIndex(iFile)).name;
@@ -145,7 +147,7 @@ parfor iFile = 1:length(fileIndex)
                    S.instrument, S.numberOfScales, S.decimationFactor);
                
     oneFileTime         = toc;
-    time2finish         = oneFileTime*(length(fileIndex)-iFile);
+    time2finish         = oneFileTime*(numFiles-iFile);
     
     disp(['last file took', num2srt(toc),'seconds'])
     disp(['estimated time to finish: ',num2str(time2finish)]);
