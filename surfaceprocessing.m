@@ -80,7 +80,7 @@ default.unit            = 'm';      % meters
 default.toDo            = 'all';    % runs all analyses
 default.bypass          = 'no';     % does not by pass pre-processing step
 default.instrument      = 'default';% runs without any specific instrument preferences
-default.numberOfScales  = 'default';% the number of scals(log space analysed
+default.numberOfScales  = 20;       % the number of scals(log space analysed
 default.decimationFactor= 1;        % decimation of point cloud
 
 S = setVal(default,userInputs,varargin);
