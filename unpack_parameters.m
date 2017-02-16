@@ -160,7 +160,7 @@ pointSize = 40;
 figure
 scatter(displacement,Power,pointSize,colorSpec, 'filled')
 hold on
-xlabel('log(displacement)')
+xlabel('Displacement (m)')
 ylabel(parameter)
 title([parameter, ' as a function of displacement at ',num2str(scale),'m using ', spectrumType,' - ' date])
 
@@ -174,9 +174,11 @@ for iFile = 1:numFiles
 end
 
 % tags to the points for analysis
-offset = 1.1;
-t = text(displacement*offset,Power,fileNameArray,...
-         'interpreter', 'none');
+if strcmp(S.text,'on')
+    offset  = 1.1;
+    t       = text(displacement*offset,Power,fileNameArray,...
+                   'interpreter', 'none');
+end
 
 for iFile = 1:numFiles
     t(iFile).Color = colorSpec(iFile,:);
@@ -184,7 +186,7 @@ end
 
 % Zero displacement Data ploted as lines
 for iLine = 1:length(zeroDispPower)
-    plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r')
+    plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r','Linewidth',4)
 end
 
 nanInd    = isnan(displacement);
@@ -195,8 +197,11 @@ goodPower = Power(goodInd);
 if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
-d = fit(goodData,goodPower,'power1');
-plot(minmaxD,(d.a*minmaxD.^d.b));
+% d = fit(goodData,goodPower,'power1');
+% plot(minmaxD,(d.a*minmaxD.^d.b));
+d = polyfit(log10(goodData),log10(goodPower),1)
+plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)),'Linewidth',2);
+
 
 % pass a best fit through well constrained data
 constrainedInd = strcmp(constraint,'Direct');
@@ -207,13 +212,17 @@ goodPower = Power(goodInd);
 if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
-d = fit(goodData,goodPower,'power1');
-plot(minmaxD,(d.a*minmaxD.^d.b), 'Linewidth',2);
+% d = fit(goodData,goodPower,'power1');
+% plot(minmaxD,(d.a*minmaxD.^d.b), 'Linewidth',2);
+
+d = polyfit(log10(goodData),log10(goodPower),1)
+plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)),'Linewidth',4);
+
 
 hold off
 ax = gca;
 set(ax,'XScale','log','YScale','log')
-grid on
+
 
 end
 
@@ -353,7 +362,7 @@ end
     % loop over files
     for iFile = 1:numFiles
         fileName            = files(fileIndex(iFile)).name;
-        load(fileName)
+        load(fileName,'parameters')
         
         if strcmp(desiredPlot,'best fits')
             desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
@@ -461,72 +470,6 @@ end
         numFiles  = length(fileIndex);
     end
 
-%% best fit the spectra while not letting instrument artefact affect results
-    function [C,H] = makebestfit(F,P,varargin)
-        % small function to make the best fit of the power spectrum
-        %
-        %     % ensure the vectors are of the same size/dimension
-        %     if length(F) == length(P)
-        
-        % possible inputs
-        inputList                   = {'FitMethod',... % to fit the data
-                                       'sectionVal',...% section to be fit (0 to 1)
-                                       'avgWindow',... % moving average windoe
-                                       'smoothing',... % smooth data ('yes'/'no')
-                                       'rolloff'};     % starting point of the section
-                                   
-        numInputList                = length(inputList);
-        
-        % make default setting ( caution, values inputed into function
-        % override these values )
-        defaultStruct.FitMethod     = 'section';
-        defaultStruct.SectionVal    = 0.2;
-        defaultStruct.avgWindow     = 11;
-        defaultStruct.smoothing     = 'yes';
-        defaultStruct.rolloff       = 10;       
-        
-        userSpec                    = varargin;
-        
-        % user specified inputs
-        for iInput = 1:numInputList
-            defaultStruct = setVal(defaultStruct,inputList(1,iInput),userSpec);
-        end
-        
-        % working structure - 
-        S           = defaultStruct;
-        
-        if size(F) ~= size(P);          P = P';                     end
-        if strcmp(S.smoothing, 'yes');  P = movmean(P,S.avgWindow); end
-        
-        if strcmp(S.FitMethod, 'default')
-            % Simplest form: take the fit over the entire calculated spectrum:
-            f           = F;
-            p           = P;
-            
-        elseif strcmp(S.FitMethod, 'section')
-            % Uninspired, but better form: take the best fit only on a
-            % specifict section of the fit.
-            
-            % In the case of the scan data, this
-            % only takes into account the larger wave lengths where the data
-            % should not be affected by instrumental artefacts
-            
-            numIn       = length(F);
-            numEntries  = ceil(numIn*S.SectionVal)-1;
-            
-            f           = F(10:numEntries);
-            p           = P(10:numEntries);
-
-        else
-            disp('error in the code making the best fit, input vectors must be the same length')
-        end
-            fitObj      = fit(f,p,'power1');
-            C           = fitObj.a;
-            BETA        = fitObj.b;
-            H           = (BETA+1)/-2;
-
-    end
-
     
 %% input parsing functions (if you want to add input options here is the place)
     function [S, SUBSETLOC, NUMFILES] = parseInput(inputs, files, numFiles, fileIndex)
@@ -545,13 +488,18 @@ userInput     = {'orientation',...
                  'parameter',...
                  'scale',...
                  'fractalSection',...
-                 'subset'};
+                 'subset',...
+                 'text'};
 numUserInput  = length(userInput);
 
-for iInput = 1:2:length(inputs)
-    if ~any([strcmp(inputs(1,iInput),scanInputInfo), ...
-             strcmp(inputs(1,iInput),userInput)])    
-        error(['input number ',inputs(1,iInput),' not allowed'])
+numInputs = length(inputs);
+if numInputs ~=0
+    for iInput = 1:2:length(inputs)
+        if ~any([strcmp(inputs(1,iInput),scanInputInfo), ...
+                strcmp(inputs(1,iInput),userInput)])
+            message = ['input number ',(inputs(1,iInput)),' not allowed'];
+            error(message)
+        end
     end
 end
 
@@ -563,6 +511,7 @@ defaultInput.wellProcssed   = repmat('yes',1,numFiles);
 defaultInput.constraint     = repmat('Direct',1,numFiles);
 defaultInput.scale          = 0.01;
 defaultInput.fractalSection = 0.03;
+defaultInput.text           = 'on';
 
 % query info in the parameter structure of the files
 

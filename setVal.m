@@ -19,7 +19,7 @@ if length(input) >= 2
         fieldName   = char(fieldName);
         
         if any(ind)
-            S.(fieldName) = value(ind); %  assign field val to even input
+            S.(fieldName) = value{ind}; %  assign field val to even input
         end
         
     end
