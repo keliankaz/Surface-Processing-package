@@ -24,10 +24,10 @@ if sum(strcmp(toDo,'FFT'))>=1 || strcmp(toDo,'all')
     % process output - concatonate the structure array  (I think)
     [Nx,Ny]             = size(PowerStructx);
     PowerStructx        = reshape(PowerStructx,1,Nx*Ny);
-    [~,Px1]             = FindErr_loop_aniso(PowerStructx);
+    [errUp,errDown,Px1]             = FindErr_loop_aniso(PowerStructx);
 
-    parameterStruct.FFT = {fx1, Px1};
-
+    parameterStruct.FFT = {fx1, Px1,errUp, errDown};
+    
 end
     
 % run plomb analysis - set at 300 sample frequencies

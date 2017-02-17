@@ -104,7 +104,6 @@ maxD        = max(displacement);
 minmaxD     = [minD,maxD];
 
 Power       = zeros(1,numFiles);
-colorSpec   = zeros(numFiles,3);
 fileNameArray = cell(1,numFiles);
 
 for iFile = 1:numFiles
@@ -118,112 +117,194 @@ for iFile = 1:numFiles
     % get the roughness data
     spectrumType        = 'FFT';
     desiredData         = parameters.(orientation).(spectrumType);
+    
     fx                  = desiredData{1,1};
     Px                  = desiredData{1,2};
-    Px                  = Px(1:length(fx));
+    
+    numFx               = length(fx);
+    Px                  = Px(1:numFx);
+    
     PxNanInd            = isnan(Px);
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
     
-    % fi
-    [C,H]               = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    if      strcmp(S.errorBound,'on')
+        
+        errUp               = desiredData{1,3};
+        errDown             = desiredData{1,4};
+        
+        errorBounds         = [errUp, errDown];
+        errorBounds         = errorBounds(1:numFx,:);
+        errorBounds         = errorBounds(~PxNanInd,:);
+        
+    else    strcmp(S.errorBound,'off')
+        
+    end
+    
+    [C,H]               = makebestfit(fx,Px,'FitMethod',    'section'       , ...
+                                            'SectionVal',   S.fractalSection, ...
+                                            'error',        errorBounds);
     
     % this is a bit awkward but fuckit im tired (we basically continue
     % with the same code but instead of using the power we just use the
     % parameter specified by the input exponent (the slope of the best
     % fit line through the data).
     
-    if      strcmp(parameter,'Hurst');          Power(iFile)= H;
-    elseif  strcmp(parameter,'prefactor');      Power(iFile)= C;
-    elseif  strcmp(parameter,'Power');          Power(iFile)= C*(1/scale)^(-1-2*H);
-    elseif  strcmp(parameter,'RMS')
+    if      strcmp(parameter,   'Hurst');          Power(iFile)= H;
+    elseif  strcmp(parameter,   'prefactor');      Power(iFile)= C;
+    elseif  strcmp(parameter,   'Power');          Power(iFile)= C*(1/scale)^(-1-2*H);
+    elseif  strcmp(parameter,   'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
         BETA = 1+2*H;
         RMS = (C/(BETA - 1))^0.5*scale*(BETA-1)/2;
         Power(iFile) = RMS; %... for the purpose of plotting...
     end
-    
-    % identify constraints on data points
-    if strcmp(constraint{iFile},'Upper Bound')
-        colorSpec(iFile,:) = [0.5 0.5 0.5];
-    elseif strcmp(constraint{iFile}, 'Direct')
-        colorSpec(iFile,:) = [0 0 0];
-    end
 end
 
-zeroInd             = displacement == 0;
+% clean out data
+nanInd    = isnan(displacement);
+zeroInd   = displacement == 0;
+
+% make data same dimension
+if size(displacement) ~= size(Power); Power = Power'; end
+
+% classify data
+
+allDisp         = displacement(~zeroInd & ~nanInd);
+allPower        = Power(~zeroInd & ~nanInd);
+
 zeroDispPower       = Power(zeroInd);
 
-pointSize = 40;
+upperBoundInd   = strcmp(constraint,'Upper Bound');
+upperBoundPower = Power(upperBoundInd           & ~zeroInd & ~nanInd);
+upperBoundDisp  = displacement(upperBoundInd    & ~zeroInd & ~nanInd);
+
+directInd       = strcmp(constraint,'Direct');
+directPower     = Power(directInd               & ~zeroInd & ~nanInd);
+directDisp      = displacement(directInd        & ~zeroInd & ~nanInd); 
 
 figure
-scatter(displacement,Power,pointSize,colorSpec, 'filled')
+
+if strcmp(S.histogram, 'on')
+    subplot(1,2,1)
+end
+
 hold on
-xlabel('Displacement (m)')
-ylabel(parameter)
-title([parameter, ' as a function of displacement at ',num2str(scale),'m using ', spectrumType,' - ' date])
 
-noLoc       = strcmp(wellProcessed, 'no');
-colorSpec   = zeros(numFiles,3);
 
-for iFile = 1:numFiles
-    if noLoc(iFile) == 1
-        colorSpec(iFile,:) = [1 0 0];
-    end
-end
+upperBoundData  = plot(upperBoundDisp, upperBoundPower);
+directData      = plot(directDisp, directPower);
 
-% tags to the points for analysis
-if strcmp(S.text,'on')
-    offset  = 1.1;
-    t       = text(displacement*offset,Power,fileNameArray,...
-                   'interpreter', 'none');
-end
+set(upperBoundData, 'LineStyle',        'none'      , ...
+                    'Marker',           'o'         , ...
+                    'MarkerSize',       10           , ...
+                    'MarkerEdgeColor',  [.4 .4 .4]  , ...
+                    'MarkerFaceColor',  [1 1 1]     );
 
-for iFile = 1:numFiles
-    t(iFile).Color = colorSpec(iFile,:);
-end
-
+set(directData,     'LineStyle',        'none'      , ...
+                    'Marker',           'o'         , ...
+                    'MarkerSize',       10           , ...
+                    'MarkerEdgeColor',  [0 0 0]     , ...
+                    'MarkerFaceColor',  [0 0 0]     );
+                
 % Zero displacement Data ploted as lines
 for iLine = 1:length(zeroDispPower)
-    plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r','Linewidth',4)
+    zeroDisplacement = plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r','Linewidth',4);
 end
 
-nanInd    = isnan(displacement);
-goodInd   = ~nanInd & ~zeroInd;
-goodData  = displacement(goodInd)';
-goodPower = Power(goodInd);
 
-if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
 % d = fit(goodData,goodPower,'power1');
 % plot(minmaxD,(d.a*minmaxD.^d.b));
-d = polyfit(log10(goodData),log10(goodPower),1)
-plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)),'Linewidth',2);
+d = polyfit(log10(allDisp),log10(allPower),1);
+disp(['slope through entire data set: ',num2str(d(1))])
+
+allDataFit  = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
+
+set(allDataFit,     'Color',            [0.5 0.5 0.5], ...
+                    'LineWidth',        2            , ...
+                    'LineStyle',        '--'         );         
 
 
 % pass a best fit through well constrained data
-constrainedInd = strcmp(constraint,'Direct');
-goodInd   = constrainedInd & ~zeroInd;
-goodData  = displacement(goodInd)';
-goodPower = Power(goodInd);
 
-if size(goodData) ~= size(goodPower); goodPower = goodPower'; end
 
 % pass a best fit line through the entire dataset
 % d = fit(goodData,goodPower,'power1');
 % plot(minmaxD,(d.a*minmaxD.^d.b), 'Linewidth',2);
 
-d = polyfit(log10(goodData),log10(goodPower),1)
-plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)),'Linewidth',4);
+d = polyfit(log10(directDisp),log10(directPower),1);
+disp(['slope through direct data set: ',num2str(d(1))])
 
+directDataFit = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
+
+set(directDataFit,    'Color',            'black'     , ...
+                    'Linewidth',        4           );
+
+% graphical considerations
+
+hXLabel = xlabel('Displacement (m)');
+hYLabel = ylabel(parameter);
+hTitle  = title([parameter, ' as a function of displacement at ',num2str(scale),'m using ', spectrumType,' - ' date]);
+
+hLegend = legend([upperBoundData   , directData, zeroDisplacement  , ...
+                   allDataFit, directDataFit]                       , ...
+                   'Upper bound displacement constraint'            , ...
+                   'Direct displacement constraint'                 , ...
+                   'Zero displacement bound'                        , ...
+                   'Fit through all data'                           , ...
+                   'Fit through data with direct displacement constraint', ...
+                   'location','SouthWest'                           );
+               
+
+set( gca                       , ...
+    'FontName'   , 'Helvetica' );
+set([hTitle, hXLabel, hYLabel], ...
+    'FontName'   , 'AvantGarde');
+set([hLegend, gca]             , ...
+    'FontSize'   , 8           );
+set([hXLabel, hYLabel]  , ...
+    'FontSize'   , 10          );
+set( hTitle                    , ...
+    'FontSize'   , 12          , ...
+    'FontWeight' , 'bold'      );       
+
+set(gca,            'XScale',           'log'       , ...
+                    'YScale',           'log'       );
+
+set(gca, ...
+  'XColor'      , [.3 .3 .3], ...
+  'YColor'      , [.3 .3 .3], ...
+  'LineWidth'   , 1         );
+               
+% tags to the points for analysis
+if strcmp(S.text,'on')
+    noLoc       = strcmp(wellProcessed, 'no');
+    colorSpec   = zeros(numFiles,3);
+    
+    for iFile = 1:numFiles
+        if noLoc(iFile) == 1
+            colorSpec(iFile,:) = [1 0 0];
+        end
+    end
+    offset  = 1.1;
+    t       = text(displacement*offset,Power,fileNameArray,...
+        'interpreter', 'none');
+    for iFile = 1:numFiles
+        t(iFile).Color = colorSpec(iFile,:);
+    end
+end
 
 hold off
-ax = gca;
-set(ax,'XScale','log','YScale','log')
 
 
+if strcmp(S.histogram, 'on') 
+    subplot(1,2,2)
+    [counts, bins] = hist(log10(Power));
+    barh(bins,counts)
+end
 end
 
 %% plot Hurst Exponent as a function of Prefactor
@@ -476,20 +557,22 @@ end
 
 % identify data
 
-% possible inputs
-scanInputInfo = {'displacement', ...
-                 'constraint', ...
-                 'wellProcessed',...
-                 'magnification',...
-                 'occular'};
+% possible inputs (not recomended, use addscaninfo instead beforehand)
+scanInputInfo = {'displacement'         , ...
+                 'constraint'           , ...
+                 'wellProcessed'        , ...
+                 'magnification'        , ...
+                 'occular'              };
 numScanInfo   = length(scanInputInfo);
              
-userInput     = {'orientation',...
-                 'parameter',...
-                 'scale',...
-                 'fractalSection',...
-                 'subset',...
-                 'text'};
+userInput     = {'orientation'          ,...    % slip parallel or perprendicular
+                 'parameter'            ,...    % what parameter to plot as a function of displacement
+                 'scale'                ,...    % length scale of interpolation
+                 'fractalSection'       ,...    % select a section of the spectra to measure slope
+                 'subset'               ,...    % select a subset of scans 
+                 'text'                 ,...    % make tags next to points
+                 'histogram'            ,...    % place histogram of roughness measurements next to plot
+                 'errorBound'           };      % make erro bounds on plot
 numUserInput  = length(userInput);
 
 numInputs = length(inputs);
@@ -512,6 +595,8 @@ defaultInput.constraint     = repmat('Direct',1,numFiles);
 defaultInput.scale          = 0.01;
 defaultInput.fractalSection = 0.03;
 defaultInput.text           = 'on';
+defaultInput.histogram      = 'off';
+defaultInput.errorBound     = 'on';
 
 % query info in the parameter structure of the files
 

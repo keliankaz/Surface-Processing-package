@@ -20,7 +20,8 @@ defaultStruct.infill    = 'yes';
 S = setVal(defaultStruct, userInput, varargin);
 
 delimeter = ' ';
-fileName = S.fileName{1};
+S.fileName
+fileName = S.fileName;
 FID       = fopen(fileName);
 
 numY = dlmread(fileName,delimeter,[3 2 3 2]);

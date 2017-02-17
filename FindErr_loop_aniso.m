@@ -1,4 +1,4 @@
-function [Errx,Px]=FindErr_loop_aniso(PowerStructx)
+function [errUp, errDown, Px]=FindErr_loop_aniso(PowerStructx)
 % output std for powerspectrum (and mean in case it is lost);
 
 % PSxArray=struct2cell(PowerStructx); % MAKE SURE THIS AGREES WITH THE DIRECTION BEING ANALYZED
@@ -28,19 +28,20 @@ function [Errx,Px]=FindErr_loop_aniso(PowerStructx)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-PSxArray=struct2cell(PowerStructx); % MAKE SURE THIS AGREES WITH THE DIRECTION BEING ANALYZED
-PxiArray_compressed=squeeze(PSxArray(3,:,:));
+PSxArray            =struct2cell(PowerStructx); % MAKE SURE THIS AGREES WITH THE DIRECTION BEING ANALYZED
+PxiArray_compressed =squeeze(PSxArray(3,:,:));
  
   maxn = numel(PxiArray_compressed);
   Px = zeros(1,maxn);
-  Errx = zeros(1,maxn);
+  errUp = zeros(1,maxn);
+  errDown = zeros(1,maxn);
   
   for m = 1:floor(length(PxiArray_compressed{1}))
-      [Px(m),Errx(m)] = columnbycolumn(PxiArray_compressed,maxn,m);
+      [Px(m),errUp(m), errDown(m)] = columnbycolumn(PxiArray_compressed,maxn,m);
   end
 end
 
-function [Px, Errx] = columnbycolumn(PxiArray_compressed,maxn,m)
+function [Px, errUp, errDown] = columnbycolumn(PxiArray_compressed,maxn,m)
 
 index = 0;
 Pxi = nan(1,maxn);
@@ -53,7 +54,20 @@ for n = 1:maxn
 end
 
 Pxi = Pxi(1:index);
-Px = nanmean(Pxi);
+
+%Px = nanmean(Pxi);
+
+% lof transform the data:
+logPxi  = log10(Pxi);
+logPx   = nanmean(logPxi);
+logErr  = nanstd(logPxi);
+
+Px      = 10^logPx;
+
+% asymetrical error bounds
+errUp   = 10^(logPx+logErr)-10^(logPx); 
+errDown = -10^(logPx-logErr)+10^(logPx); 
+
 
 % take the mode of the data
 % NTotal = ceil(sqrt(sum(~isnan(Pxi))));
@@ -66,6 +80,6 @@ Px = nanmean(Pxi);
 %     Px = nan;
 % end
 
-Errx = nanstd(Pxi);
+% Errx = nanstd(Pxi);
 
 end

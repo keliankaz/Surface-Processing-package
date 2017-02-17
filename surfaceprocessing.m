@@ -149,7 +149,7 @@ parfor iFile = 1:numFiles
     oneFileTime         = toc;
     time2finish         = oneFileTime*(numFiles-iFile);
     
-    disp(['last file took', num2srt(toc),'seconds'])
+    disp(['last file took', num2str(toc),'seconds'])
     disp(['estimated time to finish: ',num2str(time2finish)]);
 end
 

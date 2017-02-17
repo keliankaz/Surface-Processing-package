@@ -38,43 +38,51 @@ NoiseLevel=8*std(Z2);
 % set minimum length of row or column for which power will be estimated
 Nmin=10;
 
+% initialize structures
+maxNumSegment = floor(Ny/Nmin);
+PowerStructx(Nx,maxNumSegment).px = [];
+PowerStructx(Nx,maxNumSegment).fx = [];
+
 for i=1:Nx
     
-    z=Z(i,:)';
-    Iz=find(isfinite(z)); 
+    z   = Z(i,:)';
+    Iz  = find(isfinite(z)); 
     
-    if (length(Iz)>Nmin)      
-        Iz1=Iz(1);
-        Iz2=Iz(end);
-        zfinite=z(Iz1:Iz2); %trim to the actual data
-        Iz=find(isnan(zfinite));
-        Iz=[1 Iz' length(zfinite)]';
+    if length(Iz)>Nmin 
         
-        for isegment=1:length(Iz)-1   
-            z=zfinite(Iz(isegment):Iz(isegment+1)-1);
+        Iz1     = Iz(1);
+        Iz2     = Iz(end);
+        zfinite = z(Iz1:Iz2); %trim to the actual data
+        Iz      = find(isnan(zfinite));
+        Iz      =[1 Iz' length(zfinite)]';
+        
+        for isegment=1:length(Iz)-1  
+            
+            z       =zfinite(Iz(isegment):Iz(isegment+1)-1);
+            
             if (length(z)>Nmin)
-                [p,f]=powerspect(z,dx,NoiseLevel);
+                [p,f]   =powerspect(z,dx);
             else
-                p=[NaN NaN];
-                f=[0 1000];
+                p       =[NaN NaN];
+                f       =[0 1000];
             end
             
-        PowerStructx(i,isegment).px=p;
-        PowerStructx(i,isegment).fx=f; 
+        PowerStructx(i,isegment).px = p;
+        PowerStructx(i,isegment).fx = f; 
         
         % interpolate onto a consistent f vector
-        pxi=interp1(f,p,fxi);     
-        PowerStructx(i,isegment).pxi=double(pxi);
+        pxi                             =interp1(f,p,fxi);     
+        PowerStructx(i,isegment).pxi    =double(pxi);
         end
     else
         p=[NaN NaN];
         f=[0 1000]; 
-        PowerStructx(i,1).px=p;
-        PowerStructx(i,1).fx=f;
+        PowerStructx(i,1).px = p;
+        PowerStructx(i,1).fx = f;
         
         % interpolate onto a consistent f vector
-        pxi=interp1(f,p,fxi);         
-        PowerStructx(i,1).pxi=double(pxi);
+        pxi                     =interp1(f,p,fxi);         
+        PowerStructx(i,1).pxi   =double(pxi);
     end
 end
 
@@ -82,47 +90,41 @@ fx=fxi;
 end
 
 %%%%%%%%%%%%%%spectral estimation function
-function [p,f,ph] = powerspect(z,dx, NoiseLevel)
-    
-    % NoiseLevel=maximum reasonable value of 2nd deriv
-    N=length(z);
-    
+function [p,f] = powerspect(z,dx)
+
+% NoiseLevel=maximum reasonable value of 2nd deriv
+N=length(z);
+
 %     % check for large 2nd derivs
 %     z2=diff(z,2)./dx.^2;
 %     I=(abs(z2)>(4*std(abs(z2)))); % SMOOTHED ACCORDING TO TIBO
 %     %I=(abs(z2)>NoiseLevel); % ORIGINAL SMOOTHING
-%     
+%
 %     while (sum(I)>0)
-%         
+%
 %         Iz=logical([0 I' 0]');% shift to the z equivalent
 %         Ibefore=logical([I' 0 0]'); % index before
 %         Iafter=logical([0 Iz(1:end-1)']'); %index after
-%         z(Iz)=(z(Ibefore)+z(Iafter))/2;  
+%         z(Iz)=(z(Ibefore)+z(Iafter))/2;
 %         z2=diff(z,2)./dx.^2;
 %         I=(abs(z2)>(4*std(abs(z2))));
 %     end
 %     d
-    z=z-mean(z);
-    z=detrend(z);
-    z=taper(z,0.05,0.05); 
-    %w=hamming(length(z));
-    %z=z.*w;
-    
-    y=fft(z);
-% power
-    p=y.*conj(y)./(N*dx); %  /(N.*N);
-    %WS=mean(w.^2);
-    %p=p./WS; % normalize by power of window
-    % get phase info
-    %ph=angle(y);
-    
-% put back in dx
-    p=p.*dx*dx;
-    f=(0:N-1)'/(dx*N); 
+z=z-mean(z);
+z=detrend(z);
+z=taper(z,0.05,0.05);
 
-    p=p(3:N/2);
-    %ph=ph(3:N/2);
-    f=f(3:N/2);
+y=fft(z);
+
+% power
+p=y.*conj(y)./(N*dx); %  /(N.*N);
+
+
+% put back in dx
+p=p.*dx*dx;
+f=(0:N-1)'/(dx*N);
+p=p(3:N/2);
+f=f(3:N/2);
 
 end
 
