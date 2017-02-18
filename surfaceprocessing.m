@@ -51,6 +51,8 @@ function [ ] = surfaceprocessing(varargin)
 
 tic
 
+addpath(genpath(pwd))
+
 disp('Choose the input directory')
 directory_name = uigetdir;
 disp('good job!')
