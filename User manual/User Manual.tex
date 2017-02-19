@@ -1,0 +1,94 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[left=2cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage[framed,numbered,autolinebreaks,useliterate]{mcode}
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage{sidecap}
+\usepackage{subcaption}
+
+\author{Kelian Dascher-Cousineau}
+\title{User Manual for the Surface Processing Package}
+
+\begin{document}
+
+\chardef\_=`_
+
+\maketitle
+
+This manual should serve as both a basic guide to the logic and usage of the \textit{surface processing package}. 
+
+\section{Basic Use}
+
+The master function of the package is \textit{surfaceprocessing}. This function effectively deal with the inputs and direct computations towards the necessary functions. Outputs of the function are a .mat workspace file for each input data file. The workspace includes a structure (called \textit{parameters}) with the raw surface analysis outputs, the point spacing, the decimation factor (if any), the file name and the date of the analysis. The workspace also includes the grid form of the original inputed surface (called \textit{surface}), and the pre-processed copy that was used for the subsequent analysis (called \textit{zGrid}).  Inputs are always included in pairs. The former defines the type of input, the latter qualifies or quantifies the input. This structure allows for adaptability of the code to various needs. Options include the following:
+
+\begin{itemize}
+\item \textit{what to do?}: 'toDo', followed by the desired analyses on of: 'FFT','PLOMB', 'parameters' or 'all' (default is 'all') - can be a cell array. This specifies what kind of spatial analysis will be done on the input surface data. The spatial analysis is calculated and averaged across every single profiles along the surface.  The analyses are the following:
+	\begin{itemize}
+	\item 'FFT', a power spectrum computed using a Fast Fourier Transform (FFT) algorithm; 
+	\item 'PLOMB', a power spectrum computed using a least-squares Lomb-Scargle algorithm;
+	\item 'paramters', the calculation (as a function of scale) of the Root Mean Squared (RMS), skewness, kurtosis and asymmetry averaged across all segments of a given length on all profiles of the surface.
+	\end{itemize}
+
+'all' simply performs all the analyses outlined above.
+
+\item \textit{skip pre-processing?}: 'bypass', followed by 'zygo', 'pre-processing' or 'no' to  be used input is already in aligned clean grid form - input files are then (default is 'no'). 'zygo' is specifically adapted to the proprietary data format of the white light in Wong. 'pre-processing' simply skips any pre-processing. This option requires a .mat structure with a field named 'grid' with the topography and a field name 'pointSpacing' specifying the point spacing (in meters). In either case the topography must be aligned such that the positive x direction is the parallel direction.	
+
+\item \textit{for the parameter analysis, how many scales?} 'numberOfScales' followed by the desired number of analysed scales. This option is relevant to the parameters analysis. Note that this has a lot of effect on the amount of processing time (default is 10).
+
+\item \textit{decimation}: 'decimationFactor' followed by the desired decimation factor (default is 1). Decimation is a useful tool to reduce computation time. The surface grid is sub-sampled according to the decimation such that a decimation factor of $k$ would imply that only every $kth$ point on the every $kth$ will be considered for hte subsequent analysis.
+
+\item \textit{Instrument specific analysis} 'instrument' followed by 'white light', 'laser scanner' or 'lidar' (default does not set any instrument specific adjustments). Some instrument specific pre-processing steps are taken. Please contact me if you intend to use this as they may be highly dependent on the specific instrument used.
+	 
+\end{itemize}
+
+For instance, \textit{surfaceprocessing('todo','FFT','bypass','zygo')} will only perform a power spectral density analysis and will skip preprocessing and assume that all input will be in the 'zygo' export .xyz format.
+
+When the command is executed, the user will be prompted to navigate to the directory where the input data is located. IMPORTANT: the directory must \textit{only} contain files of one data format. There cannot be other files or sub-directories in the directory. The user will then be prompted to choose a destination for the output data. The requirements for the output location are less stringent. However, it is advisable to choose an empty directory such as to facilitate subsequent steps.
+
+The next step is to visualize the output of the analysis. This is done using the \textit{unpack parameters} function. This function provides various visualization options for all files in the directory chosen by the user. The first input (the \textit{desired plot}) can be one of the following:
+
+\begin{itemize}
+\item[] \textit{'FFT'}: plot all power spectra;
+\item[] \textit{'PLOMB'}: periodogram plot as determined by the Lomb-Scargle least squares analysis;
+\item[] \textit{'topostd'}: plot of the root mean squared (RMS) as a function of scale;
+\item[] \textit{'topoSkew'}: plot of skewness of height fields as a function of segment scale;
+\item[] \textit{'topoKurt'}: plot of the the kurtoisis of height fields as a function of segment scale;
+\item[] \textit{'PowerVsDisp'}: plot of power interpolated at a given scale as a function of displacement;
+\item[] \textit{'RMSVsDisp'}: model RMS at a given scale as a function of displacement
+\item[] 'Grids': shows both the original and pre-processed grid for the specified file 'fileName';
+\item[] \textit{'Best Fits'}: best logarithmic fits to power spectra obtained from the fast fourrier transform analysis.
+\end{itemize}
+
+The functionality of the packages is broadly divided into three sections: 1) importing and preprocessing data, 2) performing various spatial statistics on the pre-processed data, and 3) unpacking the analysis output into figures.
+
+In order to run smoothly the all functions included in the package should be kept in the same directory or on an accessible path. 
+
+For reference, here is a quick outline of what each function does:
+
+\begin{itemize}
+	\item[] \textit{affine\_fit}: (from mathworks) Computes the plane of best fit using least squares normal distance;
+	\item[] \textit{align\_grid}: finds the smoothest directions in a grid using FFT spectra and rotates and re-grids the input grid;
+	\item[] \textit{fault\_spectral\_density\_simple}: Calculates the average lomb-scargle spectral density every row of a N by M array;
+	\item[] \textit{FindErr\_loop\_anisotropy}
+	\item[] \textit{flatten\_XYZ}: removes planar trends from XYZ data by applying a rotations matrix according to the best fit plane (affine\_fit);
+	\item[] \textit{fractal\_model\_outlier}: Removes outlying segments according to a near-gaussian model for the distribution of RMS values at specified segment lengths (or scales);
+	\item[] \textit{frequency\_spectrum}:Calculates the average lomb-scargle spectral density of all continuous 	segments on every single row of a N by M array;
+	\item[] \textit{parse\_zygo\_format}: extracts the both the point spacing and topographic grid from the exported zygo format. Can also remove planar trend from data (substracted from grid);
+	\item[] \textit{rotateZ}: applies rotation matrix on XYZ data
+	\item[] \textit{surface\_analysis}: Aggregates the analysis functions and applies them to an input grid
+	\item[] \textit{surface\_cleaning}: removes outliers associated to surface defects
+	\item[] surface\_parameters: calculates spatial statistics and parameters along segments as a function of scale (RMS, skewness, directional asymmetry and kurtosis)
+	\item[] \textit{surface\_preprocessing\_2}: deals with preprocessing input data (import data, cleaning and gridding data)
+
+\end{itemize}
+
+
+
+\end{document}
