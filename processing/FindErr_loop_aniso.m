@@ -65,8 +65,8 @@ logErr  = nanstd(logPxi);
 Px      = 10^logPx;
 
 % asymetrical error bounds
-errUp   = 10^(logPx+logErr)-10^(logPx); 
-errDown = -10^(logPx-logErr)+10^(logPx); 
+errUp   =   10^(logPx+logErr)   - 10^(logPx); 
+errDown = - 10^(logPx-logErr)   + 10^(logPx); 
 
 
 % take the mode of the data

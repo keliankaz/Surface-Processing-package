@@ -104,6 +104,7 @@ maxD        = max(displacement);
 minmaxD     = [minD,maxD];
 
 Power       = zeros(1,numFiles);
+powerError  = zeros(numFiles,2);
 fileNameArray = cell(1,numFiles);
 
 for iFile = 1:numFiles
@@ -128,32 +129,56 @@ for iFile = 1:numFiles
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
     
-    if      strcmp(S.errorBound,'on')
+    % create error bounds or continue with default
+    if     strcmp(S.errorBound,'on')
+        
         errUp               = desiredData{1,3};
         errDown             = desiredData{1,4};
+        
         errorBounds         = [errUp, errDown];
         errorBounds         = errorBounds(1:numFx,:);
         errorBounds         = errorBounds(~PxNanInd,:);
+        
+    elseif ~strcmp(S.errorBound,'off')
+        errorBounds         = 'off';
+    else
+        error('error bound must indicate "off" or "on"')
     end
     
-    [C,H]               = makebestfit(fx,Px,'FitMethod',    'section'       , ...
-                                            'SectionVal',   S.fractalSection, ...
-                                            'error',        errorBounds);
+    % fit the data
+    fitObj                  = makebestfit(fx,Px,'FitMethod',    'section'       , ...
+                                                'SectionVal',   S.fractalSection, ...
+                                                'error',        errorBounds);
+    coefConfInt             = confint(fitObj);                                      
     
     % this is a bit awkward but fuckit im tired (we basically continue
     % with the same code but instead of using the power we just use the
     % parameter specified by the input exponent (the slope of the best
     % fit line through the data).
-    
-    if      strcmp(parameter,'Hurst');          Power(iFile)= H;
-    elseif  strcmp(parameter,'prefactor');      Power(iFile)= C;
-    elseif  strcmp(parameter,'Power');          Power(iFile)= C*(1/scale)^(-1-2*H);
-    elseif  strcmp(parameter,'RMS')
+        
+    if      strcmp(parameter,   'Hurst')      
+        Power(iFile)            = -(fitObj.b+1)/2;
+        powerError(iFile,:)     = -(coefConfInt(:,2)+1)/2;
+        
+    elseif  strcmp(parameter,   'prefactor')      
+        Power(iFile)            = fitObj.a;
+        powerError(iFile,:)     = coefConfInt(:,1);
+        
+    elseif  strcmp(parameter,   'Power')          
+        Power(iFile)            = fitObj(1/scale);
+        powerError(iFile,:)     = predint(fitObj,1/scale);
+        
+    elseif  strcmp(parameter,   'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
-        BETA = 1+2*H;
-        RMS = (C/(BETA - 1))^0.5*scale*(BETA-1)/2;
-        Power(iFile) = RMS; %... for the purpose of plotting...
+        BETA = fitObj.b;
+        RMS                     = (fitObj.a/(BETA - 1))^0.5*scale*(BETA-1)/2;
+        Power(iFile)            = RMS; %... for the purpose of plotting...
+        
+        BETAconfInt             = coefConfInt(:,1);
+        powerError              = (coefConfInt(:,1)./(BETAconfInt-1)).^0.5 ...
+                                  .*scale .*(BETAconfInt-1)/2;
+                              
     end
 end
 
@@ -171,13 +196,15 @@ allPower        = Power(~zeroInd & ~nanInd);
 
 zeroDispPower       = Power(zeroInd);
 
-upperBoundInd   = strcmp(constraint,'Upper Bound');
-upperBoundPower = Power(upperBoundInd           & ~zeroInd & ~nanInd);
-upperBoundDisp  = displacement(upperBoundInd    & ~zeroInd & ~nanInd);
+upperBoundInd       = strcmp(constraint,'Upper Bound');
+upperBoundPower     = Power         (upperBoundInd  & ~zeroInd & ~nanInd);
+upperBoundPowerErr  = powerError    (upperBoundInd  & ~zeroInd & ~nanInd, : );
+upperBoundDisp      = displacement  (upperBoundInd  & ~zeroInd & ~nanInd);
 
-directInd       = strcmp(constraint,'Direct');
-directPower     = Power(directInd               & ~zeroInd & ~nanInd);
-directDisp      = displacement(directInd        & ~zeroInd & ~nanInd); 
+directInd           = strcmp(constraint,'Direct');
+directPower         = Power         (directInd      & ~zeroInd & ~nanInd);
+directPowerErr      = powerError    (directInd      & ~zeroInd & ~nanInd, : );
+directDisp          = displacement  (directInd      & ~zeroInd & ~nanInd); 
 
 figure
 
@@ -188,18 +215,21 @@ end
 hold on
 
 
-upperBoundData  = plot(upperBoundDisp, upperBoundPower);
-directData      = plot(directDisp, directPower);
+upperBoundData  = plot(upperBoundDisp,  upperBoundPower);
+directData      = plot(directDisp,      directPower);
+
+errorBoundU     = errorbar(upperBoundDisp,  upperBoundPower, upperBoundPowerErr);
+errorBoundDir   = errorbar(directDisp,      directPower,     directPowerErr);   
 
 set(upperBoundData, 'LineStyle',        'none'      , ...
                     'Marker',           'o'         , ...
-                    'MarkerSize',       10           , ...
+                    'MarkerSize',       10          , ...
                     'MarkerEdgeColor',  [.4 .4 .4]  , ...
                     'MarkerFaceColor',  [1 1 1]     );
 
 set(directData,     'LineStyle',        'none'      , ...
                     'Marker',           'o'         , ...
-                    'MarkerSize',       10           , ...
+                    'MarkerSize',       10          , ...
                     'MarkerEdgeColor',  [0 0 0]     , ...
                     'MarkerFaceColor',  [0 0 0]     );
                 
@@ -227,13 +257,14 @@ set(allDataFit,     'Color',            [0.5 0.5 0.5], ...
 
 
 % pass a best fit line through the entire dataset
-% d = fit(goodData,goodPower,'power1');
-% plot(minmaxD,(d.a*minmaxD.^d.b), 'Linewidth',2);
+ d = fit(goodData,goodPower,'power1','Weigths',(2./diff(directPowerErr)).^2);
+ directDataFit = plot(minmaxD,d(minmaxD), 'Linewidth',2);
+ 
 
-d = polyfit(log10(directDisp),log10(directPower),1);
+% d = polyfit(log10(directDisp),log10(directPower),1);
 disp(['slope through direct data set: ',num2str(d(1))])
 
-directDataFit = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
+% directDataFit = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
 
 set(directDataFit,    'Color',            'black'     , ...
                     'Linewidth',        4           );
@@ -294,6 +325,11 @@ end
 
 hold off
 
+if ~strcmp(S.bootstrap,'off')
+    bootstat = 
+    
+end
+
 
 if strcmp(S.histogram, 'on') 
     subplot(1,2,2)
@@ -342,16 +378,13 @@ for iFile = 1:numFiles
     fx                  = fx(~PxNanInd);
     Px                  = Px(~PxNanInd);
     
-    plot(fx,Px,'b')
-    
     % get the fit
-    [C,H]               = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    fitObj              = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
     
-    hurst(iFile)        = H;
-    prefactor(iFile)    = C;
+    hurst(iFile)        = (fitObj.b+1)/-2;
+    prefactor(iFile)    = fitObj.a;
     
-    dataFit = C*fx.^(-1-2*H);
-    plot(fx,dataFit, 'r')
+    plot(fitObj,fx,Px)
     
     
 end
@@ -567,7 +600,8 @@ userInput     = {'orientation'          ,...    % slip parallel or perprendicula
                  'subset'               ,...    % select a subset of scans 
                  'text'                 ,...    % make tags next to points
                  'histogram'            ,...    % place histogram of roughness measurements next to plot
-                 'errorBound'           };      % make erro bounds on plot
+                 'errorBound'           ,...    % make erro bounds on plot
+                 'bootstrap'            ,...    % run boostrp of the fit   
 numUserInput  = length(userInput);
 
 numInputs = length(inputs);
@@ -592,6 +626,7 @@ defaultInput.fractalSection = 0.03;
 defaultInput.text           = 'on';
 defaultInput.histogram      = 'off';
 defaultInput.errorBound     = 'on';
+defaultInput.boostrap       = 'off';
 
 % query info in the parameter structure of the files
 
