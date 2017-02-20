@@ -139,7 +139,7 @@ for iFile = 1:numFiles
         errorBounds         = errorBounds(1:numFx,:);
         errorBounds         = errorBounds(~PxNanInd,:);
         
-    elseif ~strcmp(S.errorBound,'off')
+    elseif strcmp(S.errorBound,'off')
         errorBounds         = 'off';
     else
         error('error bound must indicate "off" or "on"')
@@ -218,18 +218,18 @@ hold on
 upperBoundData  = plot(upperBoundDisp,  upperBoundPower);
 directData      = plot(directDisp,      directPower);
 
-errorBoundU     = errorbar(upperBoundDisp,  upperBoundPower, upperBoundPowerErr);
-errorBoundDir   = errorbar(directDisp,      directPower,     directPowerErr);   
+% errorBoundU     = errorbar(upperBoundDisp,  upperBoundPower, upperBoundPowerErr);
+% errorBoundDir   = errorbar(directDisp,      directPower,     directPowerErr);   
 
 set(upperBoundData, 'LineStyle',        'none'      , ...
                     'Marker',           'o'         , ...
-                    'MarkerSize',       10          , ...
+                    'MarkerSize',       5           , ...
                     'MarkerEdgeColor',  [.4 .4 .4]  , ...
                     'MarkerFaceColor',  [1 1 1]     );
 
 set(directData,     'LineStyle',        'none'      , ...
                     'Marker',           'o'         , ...
-                    'MarkerSize',       10          , ...
+                    'MarkerSize',       5           , ...
                     'MarkerEdgeColor',  [0 0 0]     , ...
                     'MarkerFaceColor',  [0 0 0]     );
                 
@@ -257,14 +257,14 @@ set(allDataFit,     'Color',            [0.5 0.5 0.5], ...
 
 
 % pass a best fit line through the entire dataset
- d = fit(goodData,goodPower,'power1','Weigths',(2./diff(directPowerErr)).^2);
- directDataFit = plot(minmaxD,d(minmaxD), 'Linewidth',2);
+%  d = fit(directDisp ,directPower,'power1','Weigths',(2./diff(directPowerErr)).^2);
+%  directDataFit = plot(minmaxD,d(minmaxD), 'Linewidth',2);
  
 
-% d = polyfit(log10(directDisp),log10(directPower),1);
-disp(['slope through direct data set: ',num2str(d(1))])
+d = polyfit(log10(directDisp),log10(directPower),1);
+directDataFit = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
 
-% directDataFit = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
+disp(['slope through direct data set: ',num2str(d(1))])
 
 set(directDataFit,    'Color',            'black'     , ...
                     'Linewidth',        4           );
@@ -324,11 +324,11 @@ if strcmp(S.text,'on')
 end
 
 hold off
-
-if ~strcmp(S.bootstrap,'off')
-    bootstat = 
-    
-end
+% 
+% if ~strcmp(S.bootstrap,'off')
+%     bootstat = 
+%     
+% end
 
 
 if strcmp(S.histogram, 'on') 
@@ -601,10 +601,11 @@ userInput     = {'orientation'          ,...    % slip parallel or perprendicula
                  'text'                 ,...    % make tags next to points
                  'histogram'            ,...    % place histogram of roughness measurements next to plot
                  'errorBound'           ,...    % make erro bounds on plot
-                 'bootstrap'            ,...    % run boostrp of the fit   
+                 'bootstrap'            };      % run boostrp of the fit   
 numUserInput  = length(userInput);
 
 numInputs = length(inputs);
+
 if numInputs ~=0
     for iInput = 1:2:length(inputs)
         if ~any([strcmp(inputs(1,iInput),scanInputInfo), ...
@@ -625,7 +626,7 @@ defaultInput.scale          = 0.01;
 defaultInput.fractalSection = 0.03;
 defaultInput.text           = 'on';
 defaultInput.histogram      = 'off';
-defaultInput.errorBound     = 'on';
+defaultInput.errorBound     = 'off';
 defaultInput.boostrap       = 'off';
 
 % query info in the parameter structure of the files
