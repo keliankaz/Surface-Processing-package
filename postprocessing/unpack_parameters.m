@@ -149,7 +149,7 @@ for iFile = 1:numFiles
     fitObj                  = makebestfit(fx,Px,'FitMethod',    'section'       , ...
                                                 'SectionVal',   S.fractalSection, ...
                                                 'error',        errorBounds);
-    coefConfInt             = confint(fitObj);                                      
+    coefConfInt             = confint(fitObj,0.68);                                      
     
     % this is a bit awkward but fuckit im tired (we basically continue
     % with the same code but instead of using the power we just use the
@@ -166,7 +166,7 @@ for iFile = 1:numFiles
         
     elseif  strcmp(parameter,   'Power')          
         Power(iFile)            = fitObj(1/scale);
-        powerError(iFile,:)     = predint(fitObj,1/scale);
+        powerError(iFile,:)     = predint(fitObj,1/scale,0.68);
         
     elseif  strcmp(parameter,   'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
@@ -191,20 +191,78 @@ if size(displacement) ~= size(Power); Power = Power'; end
 
 % classify data
 
+allConstraint   = constraint(~zeroInd & ~nanInd)';
 allDisp         = displacement(~zeroInd & ~nanInd);
 allPower        = Power(~zeroInd & ~nanInd);
+allPowerError   = powerError(~zeroInd & ~nanInd, :);
 
 zeroDispPower       = Power(zeroInd);
 
-upperBoundInd       = strcmp(constraint,'Upper Bound');
-upperBoundPower     = Power         (upperBoundInd  & ~zeroInd & ~nanInd);
-upperBoundPowerErr  = powerError    (upperBoundInd  & ~zeroInd & ~nanInd, : );
-upperBoundDisp      = displacement  (upperBoundInd  & ~zeroInd & ~nanInd);
+upperBoundInd       = strcmp(allConstraint,'Upper Bound');
+upperBoundPower     = allPower         (upperBoundInd);
+upperBoundPowerErr  = allPowerError    (upperBoundInd, : );
+upperBoundDisp      = allDisp          (upperBoundInd);
 
-directInd           = strcmp(constraint,'Direct');
-directPower         = Power         (directInd      & ~zeroInd & ~nanInd);
-directPowerErr      = powerError    (directInd      & ~zeroInd & ~nanInd, : );
-directDisp          = displacement  (directInd      & ~zeroInd & ~nanInd); 
+directInd           = strcmp(allConstraint,'Direct');
+directPower         = allPower         (directInd);
+directPowerErr      = allPowerError    (directInd, : );
+directDisp          = allDisp          (directInd); 
+
+
+doMonteCarlo = 'on';
+if strcmp(doMonteCarlo,'on')
+    
+    %% fit through all data
+    % make DATA, ERROR and errorModel arrays
+    
+    DATA            = [allDisp',allPower'];
+    DATA(upperBoundInd) = DATA(upperBoundInd)/2;
+    
+    numData         = length(DATA);
+    
+    %%%%%%%%% temporary: making error arrays %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    dErr                 = allDisp'*0.1;
+    dErr(upperBoundInd)  = allDisp(upperBoundInd)/2;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    pErr      = log(allPowerError(:,2)) - log(allPower');
+
+    ERROR           = [dErr, pErr];
+    
+    dispErrorModel  = repmat({'gaussian'},numData,1);
+    upperBoundInd   = strcmp(allConstraint,'Upper Bound');
+    dispErrorModel(upperBoundInd) ...
+                    ={'equal'};
+    
+    powerErrorModel = repmat({'lognormal'},numData,1);
+
+    errorModel      = [dispErrorModel,powerErrorModel];
+    [allDataFit,allDataFitError] = runmontecalrofit(1000,DATA,ERROR , ...
+                                    'errorModel',      errorModel   , ...
+                                    'histogram',       'off'        );
+    
+    %%  fit through direct data
+    % make DATA, ERROR and errorModel arrays
+    
+    DATA            = [directDisp',directPower'];
+    
+    numData         = length(DATA);
+    
+    %%%%%%%%% temporary: making error arrays %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    dErr                 = directDisp'*0.2;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    pErr      = log(directPowerErr(:,2)) - log(directPower');
+
+    ERROR           = [dErr, pErr];
+    
+    dispErrorModel  = repmat({'gaussian'},numData,1);    
+    powerErrorModel = repmat({'lognormal'},numData,1);
+
+    errorModel      = [dispErrorModel,powerErrorModel];
+    [directDataFit,directDataFitError] = runmontecalrofit(10000,DATA,ERROR   , ...
+                                    'errorModel',      errorModel           , ...
+                                    'histogram',       'on'                );
+                                      
+end
 
 figure
 
@@ -214,20 +272,27 @@ end
 
 hold on
 
+monteCarloAllDataFit    = plot(minmaxD, ...
+                               10.^(allDataFit(1)*log10(minmaxD)+allDataFit(2))); 
 
-upperBoundData  = plot(upperBoundDisp,  upperBoundPower);
-directData      = plot(directDisp,      directPower);
+                           
+monteCarloDirectDataFit = plot(minmaxD, ...
+                               10.^(directDataFit(1)*log10(minmaxD)+directDataFit(2)));
 
-% errorBoundU     = errorbar(upperBoundDisp,  upperBoundPower, upperBoundPowerErr);
-% errorBoundDir   = errorbar(directDisp,      directPower,     directPowerErr);   
+upperBoundData          = errorbar(upperBoundDisp,  upperBoundPower, ...
+                                   upperBoundPowerErr(:,1),upperBoundPowerErr(:,2));
+directData              = errorbar(directDisp,      directPower,     ...
+                                   directPowerErr(:,1), directPowerErr(:,2));   
 
 set(upperBoundData, 'LineStyle',        'none'      , ...
+                    'Color',            [.7 .7 .7]  , ...
                     'Marker',           'o'         , ...
                     'MarkerSize',       5           , ...
                     'MarkerEdgeColor',  [.4 .4 .4]  , ...
                     'MarkerFaceColor',  [1 1 1]     );
 
 set(directData,     'LineStyle',        'none'      , ...
+                    'Color',            [.5 .5 .5]  , ...
                     'Marker',           'o'         , ...
                     'MarkerSize',       5           , ...
                     'MarkerEdgeColor',  [0 0 0]     , ...
@@ -235,24 +300,22 @@ set(directData,     'LineStyle',        'none'      , ...
                 
 % Zero displacement Data ploted as lines
 for iLine = 1:length(zeroDispPower)
-    zeroDisplacement = plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r','Linewidth',4);
+    zeroDisplacement = plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r','Linewidth',2);
 end
-
-
-
-% pass a best fit line through the entire dataset
-% d = fit(goodData,goodPower,'power1');
-% plot(minmaxD,(d.a*minmaxD.^d.b));
-d = polyfit(log10(allDisp),log10(allPower),1);
+   
+    % pass a best fit line through the entire dataset
+    % d = fit(goodData,goodPower,'power1');
+    % plot(minmaxD,(d.a*minmaxD.^d.b));
+    d = polyfit(log10(allDisp),log10(allPower),1);
+    
 disp(['slope through entire data set: ',num2str(d(1))])
 
-allDataFit  = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
+allDataFitLine  = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
 
-set(allDataFit,     'Color',            [0.5 0.5 0.5], ...
+set(allDataFitLine, 'Color',            [0.5 0.5 0.5], ...
                     'LineWidth',        2            , ...
                     'LineStyle',        '--'         );         
-
-
+         
 % pass a best fit through well constrained data
 
 
@@ -262,12 +325,12 @@ set(allDataFit,     'Color',            [0.5 0.5 0.5], ...
  
 
 d = polyfit(log10(directDisp),log10(directPower),1);
-directDataFit = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
+directDataFitLine = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
 
 disp(['slope through direct data set: ',num2str(d(1))])
 
-set(directDataFit,    'Color',            'black'     , ...
-                    'Linewidth',        4           );
+set(directDataFitLine,  'Color',            'black'     , ...
+                        'Linewidth',        3           );
 
 % graphical considerations
 
@@ -275,16 +338,20 @@ hXLabel = xlabel('Displacement (m)');
 hYLabel = ylabel(parameter);
 hTitle  = title([parameter, ' as a function of displacement at ',num2str(scale),'m using ', spectrumType,' - ' date]);
 
-hLegend = legend([upperBoundData   , directData, zeroDisplacement  , ...
-                   allDataFit, directDataFit]                       , ...
+hLegend = legend([upperBoundData   , directData, zeroDisplacement   , ...
+                   allDataFitLine, directDataFitLine]               , ...
                    'Upper bound displacement constraint'            , ...
                    'Direct displacement constraint'                 , ...
                    'Zero displacement bound'                        , ...
-                   'Fit through all data'                           , ...
-                   'Fit through data with direct displacement constraint', ...
+                   sprintf('Fit through all data: \\it{P(d) = %0.2g d^{%0.2g \\pm %0.1g}}', ...
+                            10^allDataFit(2), allDataFit(1), allDataFitError(2)),  ...
+                   sprintf('Fit through data with direct displacement constraint: \\it{P(d) = %0.2g d^{%0.2g \\pm %0.1g}}', ...
+                             10^directDataFit(2), directDataFit(1), directDataFitError(2)),  ...
                    'location','SouthWest'                           );
                
 
+
+               
 set( gca                       , ...
     'FontName'   , 'Helvetica' );
 set([hTitle, hXLabel, hYLabel], ...
@@ -317,19 +384,13 @@ if strcmp(S.text,'on')
     end
     offset  = 1.1;
     t       = text(displacement*offset,Power,fileNameArray,...
-        'interpreter', 'none');
+                  'interpreter', 'none');
     for iFile = 1:numFiles
         t(iFile).Color = colorSpec(iFile,:);
     end
 end
 
 hold off
-% 
-% if ~strcmp(S.bootstrap,'off')
-%     bootstat = 
-%     
-% end
-
 
 if strcmp(S.histogram, 'on') 
     subplot(1,2,2)
@@ -620,8 +681,8 @@ end
 defaultInput                = [];
 defaultInput.orientation    = 'parallel';
 defaultInput.parameter      = 'Power';
-defaultInput.wellProcssed   = repmat('yes',1,numFiles);
-defaultInput.constraint     = repmat('Direct',1,numFiles);
+defaultInput.wellProcssed   = repmat({'yes'},1,numFiles);
+defaultInput.constraint     = repmat({'Direct'},1,numFiles);
 defaultInput.scale          = 0.01;
 defaultInput.fractalSection = 0.03;
 defaultInput.text           = 'on';
