@@ -35,7 +35,8 @@
         numIn       = length(F);
         
         if     ~strcmp(S.error,     'off')
-            weightArray = (1./((S.error(:,1)-S.error(:,2))/2).^2)';
+            logsigma    = log10(S.error(:,1))-log10(P);
+            weightArray = 1./logsigma.^2;
         else
             weightArray = ones(1,numIn);
         end
@@ -69,7 +70,7 @@
         end
         
 
-            fitObj      = fit(f,p,'power1','Weights',weightArray);            
+            fitObj      = fit(log10(f),log10(p),'poly1','Weights',weightArray);            
 %             C           = fitObj.a;
 %             BETA        = fitObj.b;
 %             H           = (BETA+1)/-2;

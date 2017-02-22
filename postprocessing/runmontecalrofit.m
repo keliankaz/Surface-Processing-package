@@ -8,9 +8,12 @@ function [FITCOEFF,FITERROR] = runmontecalrofit(N,DATA, ERROR, varargin)
 % ERROR:    corresponding 1 sigma error (according to error model)
 
 % varargin: (input pairs)
-% ...,xErrorModel,ERRORMODEL,... : type of error model 'gaussian', 'lognormal'                             'lognormal' x coordinate point. Cell
+% ...,xErrorModel,ERRORMODEL,... : type of error model 'gaussian', 'lognormal'
 %                                  or 'equal'. Cell array with dimension
-%                                  equivalent to
+%                                  equivalent to length(DATA)
+% ...,fitModel,FITMODEL,...      : out of use do not use
+% ...,histogram, 'on',...        : plot histogram of results 'on' or 'off'
+%                                 (default)
 
 dim             = size(DATA);
 numPoints       = max(dim); % number of points in the data set
@@ -22,7 +25,7 @@ userInput       = {'errorModel'     , ...
                      
 defaultStruct               = [];
 defaultStruct.errorModel    = repmat({'gaussian'},numDim,numPoints);
-defaultStruct.histogram     = 'on';
+defaultStruct.histogram     = 'off';
 
 defaultStruct.fitModel      = 'power1';
 
@@ -65,15 +68,8 @@ for n = 1:N
         numInd          = length(loc);
         newDATA(loc)    = DATA(loc) + (2*rand(numInd,1)-1).*ERROR(loc);
     end
-    
     d               = polyfit(log10(newDATA(:,1)),log10(newDATA(:,2)),1);
     fitCoeffs(n,:)  = d;
-
-%     fitObj          = fit(newDATA(:,numDim-1),newDATA(:,end),fitType    , ...
-%                           'StartPoint',     [mean(newDATA(:,end)), -2]  , ... 
-%                           'Lower',          [0,-Inf]                    , ...
-%                           'Upper',          [+Inf, 0]                   );
-%    fitCoeffs(n,:)  = coeffvalues(fitObj);
     
 end
 

@@ -51,6 +51,10 @@ function [ ] = surfaceprocessing(varargin)
 
 tic
 
+% save users command:
+hist        = com.mathworks.mlservices.MLCommandHistoryServices.getSessionHistory;
+userCommand = hist(end);
+
 addpath(genpath(pwd))
 
 disp('Choose the input directory')
@@ -69,12 +73,13 @@ disp('Nice!')
 
 % possible user inputs:
 
-userInputs      = {'unit',...
-                   'toDo',...
-                   'bypass',...
-                   'instrument',...
-                   'numberOfScales',...
-                   'decimationFactor'};
+userInputs      = {'unit'               ,...
+                   'toDo'               ,...
+                   'bypass'             ,...
+                   'instrument'         ,...
+                   'numberOfScales'     ,...
+                   'decimationFactor'   ,...
+                   'orientation'        };
 
 % default values;
 default                 = [];       % initialize structure
@@ -84,56 +89,10 @@ default.bypass          = 'no';     % does not by pass pre-processing step
 default.instrument      = 'default';% runs without any specific instrument preferences
 default.numberOfScales  = 20;       % the number of scals(log space analysed
 default.decimationFactor= 1;        % decimation of point cloud
+default.orientation     = 'all';    %
 
 S = setVal(default,userInputs,varargin);
 
-% % unit
-% ind = strcmp(varargin,'unit');
-% if any(ind)
-%     unit = varargin{find(ind)+1};
-% else
-%     unit = 'm'; % meters (default)
-% end 
-% 
-% % to do list
-% ind = strcmp(varargin,'toDo');
-% if any(ind)
-%     toDo = varargin{find(ind)+1};
-% else
-%     toDo = 'all'; % meters (default)
-% end 
-% 
-% % bypass skip preprocessing 'yes', 'no'
-% ind = strcmp(varargin,'bypass');
-% if any(ind)
-%     bypass = varargin{find(ind)+1};
-% else
-%     bypass = 'no'; % (default)
-% end 
-% 
-% % instrument
-% ind = strcmp(varargin,'instrument');
-% if any(ind)
-%     instrument = varargin{find(ind)+1};
-% else
-%     instrument = 'default';
-% end
-% 
-% % number of scale
-% ind = strcmp(varargin,'numberOfScales');
-% if any(ind)
-%     numberOfScales = varargin{find(ind)+1};
-% else
-%     numberOfScales = 'default'; % default is ten scales
-% end 
-% 
-% % decimation factor
-% ind = strcmp(varargin,'decimationFactor');
-% if any(ind)
-%     decimationFactor = varargin{find(ind)+1};
-% else
-%     decimationFactor = 'default';
-% end
 
 %% process data:
 
@@ -145,8 +104,16 @@ parfor iFile = 1:numFiles
     fileName            = files(fileIndex(iFile)).name;
     disp(['Now processing: ',fileName])
     
-    parfor_process(fileName,S.unit,S.toDo,destination_directory, S.bypass, ...
-                   S.instrument, S.numberOfScales, S.decimationFactor);
+    parfor_process(fileName,        ...
+                   S.unit,          ...
+                   S.toDo,          ...
+                   destination_directory, ...
+                   S.bypass,        ...
+                   S.instrument,    ...
+                   S.numberOfScales,...
+                   S.decimationFactor,...
+                   S.orientation,   ...    
+                   userCommand      );
                
     oneFileTime         = toc;
     time2finish         = oneFileTime*(numFiles-iFile);
@@ -159,9 +126,16 @@ end
 disp('Alright we are done here!')
 end
 
-function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
-                             bypass,instrument,numberOfScales, ...
-                             decimationFactor)
+function [] = parfor_process(fileName,              ...
+                             unit,                  ...
+                             toDo,                  ...
+                             destination_directory, ...
+                             bypass,                ...
+                             instrument,            ...
+                             numberOfScales,        ...
+                             decimationFactor,      ...
+                             orientation,           ...
+                             userCommand)
 % this function enssentially enables the parfor loop to be completey
 % parallel - otherwise the program runs into transparency issues.
 
@@ -183,14 +157,21 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     else
         disp('warning bypass must be yes or no')
     end
+    
+    
+    if strcmp(orientation,'all')
+        parameters.parallel = ...
+            surface_analysis(zGrid,pointSpacing,numberOfScales, ...
+                             decimationFactor,toDo);
         
-    parameters.parallel = ...
+        parameters.perpendicular = ...
+            surface_analysis(zGrid',pointSpacing,numberOfScales, ...
+                             decimationFactor,toDo);
+    else 
+            parameters.(orientation) = ...
         surface_analysis(zGrid,pointSpacing,numberOfScales, ...
                          decimationFactor,toDo);
-    
-    parameters.perpendicular = ...
-        surface_analysis(zGrid',pointSpacing,numberOfScales, ...
-                         decimationFactor,toDo);
+    end
     
     parameters.pointSpacing = pointSpacing;
     parameters.fileName     = fileName;
@@ -199,6 +180,7 @@ function [] = parfor_process(fileName,unit,toDo,destination_directory, ...
     parameters.NumberOfSampledScales = numberOfScales;
     parameters.Date         = date;
     parameters.processingTime = toc;
+    parameters.userCommand  = userCommand;
         
     % save output
     fileNameSpec        = '%s_processing_output.mat';

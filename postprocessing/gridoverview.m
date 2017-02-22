@@ -78,13 +78,18 @@ Px                  = Px(~PxNanInd);
 fitObj              = makebestfit(fx,Px,'FitMethod',     'section'   , ...
                                         'SectionVal',    0.03        , ...
                                         'error',         errorArray  );
-plot(fitObj,fx,Px);
-legend('power spectral density (geometrical mean +/- 1\sigma))', ...
-        sprintf('fit through fractal bands width: p(f) = %0.1d f^{%0.1f}',fitObj.a, fitObj.b))
+fractalFitLine  = plot(fx,10.^(fitObj.p1*log10(fx)+fitObj.p2),'r');
 hold on
+dataScatter     = plot(fx,Px, '.-b');
 if ~strcmp(errorArray,'off')
     shadedErrorBar(fx,Px,errorArray','k',1);
 end
+
+legend([dataScatter, fractalFitLine], ...
+        'power spectral density (geometrical mean +/- 1\sigma)', ...
+        sprintf('fit through fractal bands width: p(f) = %0.1d f^{%0.1f}',10^fitObj.p2, fitObj.p1))
+
+
 ax = gca;
 set(ax,'XScale', 'log', 'YScale', 'log')
 title('Power Spectrum')

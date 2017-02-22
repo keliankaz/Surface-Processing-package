@@ -88,12 +88,13 @@ end
 [S,subsetLoc,numFiles]= parseInput(inputs,files,numFiles,fileIndex); 
 
 % extract all the info from the strucutre now that it is set
-orientation = S.orientation;   
-parameter   = S.parameter;     
-scale       = S.scale;   
-displacement= S.displacement;
-constraint  = S.constraint;
-wellProcessed=S.wellProcessed;
+orientation         = S.orientation;   
+parameter           = S.parameter;     
+scale               = S.scale;   
+displacement        = S.displacement;
+constraint          = S.constraint;
+wellProcessed       = S.wellProcessed;
+displacementError   = S.displacementError.*displacement;
 
 % create plots:
 
@@ -149,7 +150,8 @@ for iFile = 1:numFiles
     fitObj                  = makebestfit(fx,Px,'FitMethod',    'section'       , ...
                                                 'SectionVal',   S.fractalSection, ...
                                                 'error',        errorBounds);
-    coefConfInt             = confint(fitObj,0.68);                                      
+    coefConfInt             = confint(fitObj,0.68);
+    coefConfInt(:,2)        = 10.^coefConfInt(:,2);
     
     % this is a bit awkward but fuckit im tired (we basically continue
     % with the same code but instead of using the power we just use the
@@ -157,29 +159,31 @@ for iFile = 1:numFiles
     % fit line through the data).
         
     if      strcmp(parameter,   'Hurst')      
-        Power(iFile)            = -(fitObj.b+1)/2;
+        Power(iFile)            = -(fitObj.p1+1)/2;
         powerError(iFile,:)     = -(coefConfInt(:,2)+1)/2;
         
     elseif  strcmp(parameter,   'prefactor')      
-        Power(iFile)            = fitObj.a;
+        Power(iFile)            = 10^fitObj.p2;
         powerError(iFile,:)     = coefConfInt(:,1);
         
     elseif  strcmp(parameter,   'Power')          
-        Power(iFile)            = fitObj(1/scale);
-        powerError(iFile,:)     = predint(fitObj,1/scale,0.68);
+        Power(iFile)            = 10.^fitObj(log10(1/scale));
+        powerError(iFile,:)     = 10.^predint(fitObj,log10(1/scale),0.68);
         
     elseif  strcmp(parameter,   'RMS')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
-        BETA = fitObj.b;
-        RMS                     = (fitObj.a/(BETA - 1))^0.5*scale*(BETA-1)/2;
+        BETA = fitObj.p1;
+        RMS                     = (10^fitObj.p2/(BETA - 1))^0.5*scale*(BETA-1)/2;
         Power(iFile)            = RMS; %... for the purpose of plotting...
         
         BETAconfInt             = coefConfInt(:,1);
-        powerError              = (coefConfInt(:,1)./(BETAconfInt-1)).^0.5 ...
+        powerError              = (coefConfInt(:,2)./(BETAconfInt-1)).^0.5 ...
                                   .*scale .*(BETAconfInt-1)/2;
                               
     end
+    
+   
 end
 
 % clean out data
@@ -191,10 +195,11 @@ if size(displacement) ~= size(Power); Power = Power'; end
 
 % classify data
 
-allConstraint   = constraint(~zeroInd & ~nanInd)';
-allDisp         = displacement(~zeroInd & ~nanInd);
-allPower        = Power(~zeroInd & ~nanInd);
-allPowerError   = powerError(~zeroInd & ~nanInd, :);
+allConstraint   = constraint        (~zeroInd & ~nanInd)';
+allDisp         = displacement      (~zeroInd & ~nanInd);
+allDispError    = displacementError (~zeroInd & ~nanInd);
+allPower        = Power             (~zeroInd & ~nanInd);
+allPowerError   = powerError        (~zeroInd & ~nanInd, :);
 
 zeroDispPower       = Power(zeroInd);
 
@@ -202,12 +207,13 @@ upperBoundInd       = strcmp(allConstraint,'Upper Bound');
 upperBoundPower     = allPower         (upperBoundInd);
 upperBoundPowerErr  = allPowerError    (upperBoundInd, : );
 upperBoundDisp      = allDisp          (upperBoundInd);
+upperBoundDispError = allDispError     (upperBoundInd);
 
 directInd           = strcmp(allConstraint,'Direct');
 directPower         = allPower         (directInd);
 directPowerErr      = allPowerError    (directInd, : );
 directDisp          = allDisp          (directInd); 
-
+directDispError     = allDispError     (directInd); 
 
 doMonteCarlo = 'on';
 if strcmp(doMonteCarlo,'on')
@@ -221,7 +227,7 @@ if strcmp(doMonteCarlo,'on')
     numData         = length(DATA);
     
     %%%%%%%%% temporary: making error arrays %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    dErr                 = allDisp'*0.1;
+    dErr                 = allDispError';
     dErr(upperBoundInd)  = allDisp(upperBoundInd)/2;
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     pErr      = log(allPowerError(:,2)) - log(allPower');
@@ -248,7 +254,7 @@ if strcmp(doMonteCarlo,'on')
     numData         = length(DATA);
     
     %%%%%%%%% temporary: making error arrays %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    dErr                 = directDisp'*0.2;
+    dErr                 = directDispError';
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     pErr      = log(directPowerErr(:,2)) - log(directPower');
 
@@ -258,9 +264,9 @@ if strcmp(doMonteCarlo,'on')
     powerErrorModel = repmat({'lognormal'},numData,1);
 
     errorModel      = [dispErrorModel,powerErrorModel];
-    [directDataFit,directDataFitError] = runmontecalrofit(10000,DATA,ERROR   , ...
+    [directDataFit,directDataFitError] = runmontecalrofit(1000,DATA,ERROR   , ...
                                     'errorModel',      errorModel           , ...
-                                    'histogram',       'on'                );
+                                    'histogram',       'off'                );
                                       
 end
 
@@ -279,14 +285,21 @@ monteCarloAllDataFit    = plot(minmaxD, ...
 monteCarloDirectDataFit = plot(minmaxD, ...
                                10.^(directDataFit(1)*log10(minmaxD)+directDataFit(2)));
 
-upperBoundData          = errorbar(upperBoundDisp,  upperBoundPower, ...
-                                   upperBoundPowerErr(:,1),upperBoundPowerErr(:,2));
-directData              = errorbar(directDisp,      directPower,     ...
-                                   directPowerErr(:,1), directPowerErr(:,2));   
+upperBoundData          = errorbar(upperBoundDisp,  upperBoundPower     , ...
+                                  -upperBoundPowerErr(:,1) + upperBoundPower' , ...
+                                   upperBoundPowerErr(:,2) - upperBoundPower' , ...
+                                   upperBoundDispError                  , ...
+                                   upperBoundDispError                  );
+                               
+directData              = errorbar(directDisp,      directPower         , ...
+                                  -directPowerErr(:,1) + directPower'   , ...
+                                   directPowerErr(:,2) - directPower'   , ...
+                                   directDispError                      , ...
+                                   directDispError                      );   
 
 set(upperBoundData, 'LineStyle',        'none'      , ...
                     'Color',            [.7 .7 .7]  , ...
-                    'Marker',           'o'         , ...
+                    'Marker',           's'         , ...
                     'MarkerSize',       5           , ...
                     'MarkerEdgeColor',  [.4 .4 .4]  , ...
                     'MarkerFaceColor',  [1 1 1]     );
@@ -535,20 +548,56 @@ end
         load(fileName,'parameters')
         
         if strcmp(desiredPlot,'best fits')
-            desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
-            desiredCell     = desiredStruct;
             
-            wavelength      = 1./desiredCell{1};
-            power           = desiredCell{2};
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            power           = power(1:length(wavelength));
-            nanInd          = isnan(power);
-            power           = power(~nanInd);
-            wavelength      = wavelength(~nanInd);
+            spectrumType        = 'FFT';
+            desiredData         = parameters.(orientation).(spectrumType);
+            fx                  = desiredData{1,1};
+            Px                  = desiredData{1,2};
             
-            d               = polyfit(log10(wavelength'),log10(power),1);
-            x               = [min(wavelength),max(wavelength)];
-            y               = 10.^(d(1)*log10(x)+d(2));
+            numFxIn             = length(fx);
+            
+            Px                  = Px(1:numFxIn);
+            
+            PxNanInd            = isnan(Px);
+            fx                  = fx(~PxNanInd);
+            Px                  = Px(~PxNanInd);
+            
+            try
+                errUp               = desiredData{1,3}';
+                errDown             = desiredData{1,4}';
+                errorArray          = [errUp,errDown];
+                errorArray          = errorArray(1:numFxIn,:);
+                errorArray          = errorArray(~PxNanInd,:);
+            catch
+                errorArray          = 'off';
+            end
+
+            fitObj              = makebestfit(fx,Px,'FitMethod',     'section'   , ...
+                'SectionVal',    0.03        , ...
+                'error',         errorArray  );
+            plot(fitObj,fx,Px);       
+            if ~strcmp(errorArray,'off')
+                shadedErrorBar(fx,Px,errorArray','k',1);
+            end
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+%             desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
+%             desiredCell     = desiredStruct;
+%             
+%             wavelength      = 1./desiredCell{1};
+%             power           = desiredCell{2};
+%             
+%             power           = power(1:length(wavelength));
+%             nanInd          = isnan(power);
+%             power           = power(~nanInd);
+%             wavelength      = wavelength(~nanInd);
+%             
+%             d               = polyfit(log10(wavelength'),log10(power),1);
+%             x               = [min(wavelength),max(wavelength)];
+%             y               = 10.^(d(1)*log10(x)+d(2));
             
         else
             desiredStruct   = getfield(getfield(parameters, orientation),desiredPlot);
@@ -574,16 +623,16 @@ end
                 end
                 
             end
+            
+            plot(x,y,'.-')
+            
+
         end
         
         scanName = getfield(parameters,'fileName');
-        
-        % create the plots
-        if length(inputs) == 1
-            plot(x,y,'.-')
-            legendArray{1,iFile} = fileName;
+        legendArray{1,iFile} = fileName; 
             
-        elseif length(inputs) >= 2
+        if length(inputs) >= 2
             % set color as a function of displacement
             if D(iFile) == 0
                 colorForDisp = [0 1 0];
@@ -625,6 +674,8 @@ end
         end
     end
     
+    
+    
     legend(legendArray,'interpreter', 'none')
     
     end
@@ -649,6 +700,7 @@ end
 % possible inputs (not recomended, use addscaninfo instead beforehand)
 scanInputInfo = {'displacement'         , ...
                  'constraint'           , ...
+                 'displacementError'    , ...
                  'wellProcessed'        , ...
                  'magnification'        , ...
                  'occular'              };
@@ -685,10 +737,12 @@ defaultInput.wellProcssed   = repmat({'yes'},1,numFiles);
 defaultInput.constraint     = repmat({'Direct'},1,numFiles);
 defaultInput.scale          = 0.01;
 defaultInput.fractalSection = 0.03;
-defaultInput.text           = 'on';
+defaultInput.text           = 'off';
 defaultInput.histogram      = 'off';
 defaultInput.errorBound     = 'off';
 defaultInput.boostrap       = 'off';
+
+defaultInput.displacementError = ones(1,numFiles)*0.2;
 
 % query info in the parameter structure of the files
 
@@ -742,7 +796,7 @@ SUBSETLOC   = find(subsetInd);
 NUMFILES    = sum(subsetInd);
 
 for iScanInfo = 1:numScanInfo          
-    S.(scanInputInfo{1,iScanInfo}) = S.(scanInputInfo{1,iScanInfo})(1,subsetInd);
+    S.(scanInputInfo{1,iScanInfo}) = S.(scanInputInfo{1,iScanInfo})(1,SUBSETLOC);
 end
    
     end
