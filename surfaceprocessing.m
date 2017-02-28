@@ -64,7 +64,9 @@ files = dir(directory_name);
 addpath(directory_name)
 
 disp('Now choose the output directory')
-fileIndex = find(~[files.isdir] & ~strcmp({files.name},'.DS_Store'));
+fileIndex = find(~[files.isdir]                         & ...
+                 ~strcmp({files.name},'.DS_Store')      & ...
+                 ~strcmp({files.name},'._.DS_Store')    );
 
 destination_directory = uigetdir;
 disp('Nice!')
@@ -98,7 +100,8 @@ S = setVal(default,userInputs,varargin);
 
 numFiles    =  length(fileIndex);
 
-parfor iFile = 1:numFiles
+
+for iFile = 1:numFiles
     tic 
     
     fileName            = files(fileIndex(iFile)).name;
@@ -118,7 +121,7 @@ parfor iFile = 1:numFiles
     oneFileTime         = toc;
     time2finish         = oneFileTime*(numFiles-iFile);
     
-    disp(['last file took', num2str(toc),'seconds'])
+    disp(['last file took ', num2str(toc),' seconds'])
     disp(['estimated time to finish: ',num2str(time2finish)]);
 end
 
