@@ -40,8 +40,10 @@ Nmin=10;
 
 % initialize structures
 maxNumSegment = floor(Ny/Nmin);
-PowerStructx(Nx,maxNumSegment).px = [];
-PowerStructx(Nx,maxNumSegment).fx = [];
+
+% I think this initializtion actually makes things slower 
+% PowerStructx(Nx,maxNumSegment).px = [];
+% PowerStructx(Nx,maxNumSegment).fx = [];
 
 for i=1:Nx
     

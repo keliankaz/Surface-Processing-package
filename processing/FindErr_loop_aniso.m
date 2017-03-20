@@ -47,7 +47,7 @@ index = 0;
 Pxi = nan(1,maxn);
 
 for n = 1:maxn
-    if (length(isfinite(PxiArray_compressed{n}))>2)
+    if isfinite(PxiArray_compressed{n}(3))
         index = index + 1;
         Pxi(n) = PxiArray_compressed{n}(m);
     end

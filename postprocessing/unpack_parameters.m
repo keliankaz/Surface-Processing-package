@@ -522,28 +522,29 @@ end
     function [] = plotspectra(desiredPlot,inputs)
         
     [files, numFiles,fileIndex] = getfiles();
+    [S,subsetLoc,numFiles]= parseInput(inputs,files,numFiles,fileIndex); 
+
+    % extract all the info from the strucutre now that it is set
+    orientation         = S.orientation;          
+    displacement        = S.displacement;
+    constraint          = S.constraint;
+
+    % create plots:
     
-    legendArray = cell(1,numFiles);
-    orientation = inputs{1};
-    hold on
-    
-    if length(inputs) >= 2
-        displacement = inputs{2};
-        D = displacement;
-        minD = min(D(D~=0));
-        maxD = max(D);
+    % create the displacement "domain" - for line plotting
+    if any(displacement ~= 0)
+        minD        = min(displacement(displacement~=0));
+        maxD        = max(displacement);
         logMinD = log10(minD);
         logMaxD = log10(maxD);
         logDelD = logMaxD-logMinD;
-        
     end
     
-    if length(inputs) >=3
-        constraint = inputs{3};
-    end
+    legendArray = cell(1,numFiles);
+    hold on
     
     % loop over files
-    for iFile = 1:numFiles
+    for iFile = subsetLoc
         fileName            = files(fileIndex(iFile)).name;
         load(fileName,'parameters')
         
@@ -632,36 +633,34 @@ end
         scanName = getfield(parameters,'fileName');
         legendArray{1,iFile} = fileName; 
             
-        if length(inputs) >= 2
-            % set color as a function of displacement
-            if D(iFile) == 0
-                colorForDisp = [0 1 0];
-            else
-                colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
-                colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
-            end
-            
-            % set unknow displacements to grey
-            if sum(isnan(colorForDisp)) ~= 0
-                colorForDisp = [0.5, 0.5, 0.5];
-            end
-            
-            p = plot(x,y,'-');
-            p.Color = colorForDisp;
-            formatSpec = 'D = %d - file: %s';
-            legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
-                scanName);
-            xlabel('Scale (m)')
+        % set color as a function of displacement
+        if displacement(iFile) == 0
+            colorForDisp = [0 1 0];
+        else
+            colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
+            colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
         end
         
-        % to help distinguish points whith various constraints on displacement
-        if length(inputs) >=3
-            if strcmp(constraint{iFile}, 'Direct')
-                p.LineWidth = 3;
-            elseif strcmp(constraint{iFile},'Upper Bound')
-                p.LineWidth = 0.2;
-            end
+        % set unknow displacements to grey
+        if sum(isnan(colorForDisp)) ~= 0
+            colorForDisp = [0.5, 0.5, 0.5];
         end
+        
+        p = plot(x,y,'-');
+        p.Color = colorForDisp;
+        formatSpec = 'D = %d - file: %s';
+        legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
+            scanName);
+        xlabel('Scale (m)')
+
+        
+        % to help distinguish points whith various constraints on displacement
+        if strcmp(constraint{iFile}, 'Direct')
+            p.LineWidth = 3;
+        elseif strcmp(constraint{iFile},'Upper Bound')
+            p.LineWidth = 0.2;
+        end
+        
         
         
         ylabel(desiredPlot)
@@ -682,12 +681,15 @@ end
 
 %% small function to query the files in the desired directory
     function [files, numFiles, fileIndex] = getfiles()
+    
         directory_name = uigetdir;
         files = dir(directory_name);
         addpath(directory_name)
-        save('files', 'files')
         
-        fileIndex = find(~[files.isdir]& ~ strcmp({files.name},'._.DS_Store') & ~ strcmp({files.name},'.DS_Store'));
+        save('files', 'files')
+        fileIndex = find(~[files.isdir]                         & ...
+                         ~ strcmp({files.name},'._.DS_Store')   & ...
+                         ~ strcmp({files.name},'.DS_Store'));
         numFiles  = length(fileIndex);
     end
 
