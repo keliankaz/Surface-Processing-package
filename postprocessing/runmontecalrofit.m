@@ -15,6 +15,7 @@ function [FITCOEFF,FITERROR] = runmontecalrofit(N,DATA, ERROR, varargin)
 % ...,histogram, 'on',...        : plot histogram of results 'on' or 'off'
 %                                 (default)
 
+
 dim             = size(DATA);
 numPoints       = max(dim); % number of points in the data set
 numDim          = min(dim); % number of dimensions in the dataset

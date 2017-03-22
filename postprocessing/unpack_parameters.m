@@ -62,6 +62,23 @@ function [] = unpack_parameters(desiredPlot, varargin)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% examples:
+
+%% 1.
+% To plot the Power exponent as a function of displacement ('PowerVsDisp'),
+% at a scale of 0.0001 ('scale' ,0.0001), only considering scans taken with
+% the 2.75 occular ('scale' ,0.0001), with sample names displayed next to
+% points for reference ('text', 'on'):
+
+% unpack_parameters('PowerVsDisp','scale' ,0.0001,'subset',{'occular',2.75},'text', 'on')
+
+%% 2. 
+% To plot all the fast fourier transform ('FFT') spectra in a directory
+% color coded according to the displacement values specified in their
+% respective -parameter- structure, in the parallel direction
+% ('orientation','parallel'):
+
+% unpack_parameters('FFT','orientation','parallel')
 
 %% roughness at a given scale as a function of displacement
 
@@ -94,7 +111,7 @@ scale               = S.scale;
 displacement        = S.displacement;
 constraint          = S.constraint;
 wellProcessed       = S.wellProcessed;
-displacementError   = S.displacementError.*displacement;
+displacementError   = S.displacementError;
 
 % create plots:
 
@@ -242,7 +259,7 @@ if strcmp(doMonteCarlo,'on')
     powerErrorModel = repmat({'lognormal'},numData,1);
 
     errorModel      = [dispErrorModel,powerErrorModel];
-    [allDataFit,allDataFitError] = runmontecalrofit(1000,DATA,ERROR , ...
+    [allDataFit,allDataFitError] = runmontecalrofit(100,DATA,ERROR , ...
                                     'errorModel',      errorModel   , ...
                                     'histogram',       'off'        );
     
@@ -320,8 +337,7 @@ end
     % d = fit(goodData,goodPower,'power1');
     % plot(minmaxD,(d.a*minmaxD.^d.b));
     d = polyfit(log10(allDisp),log10(allPower),1);
-    
-disp(['slope through entire data set: ',num2str(d(1))])
+
 
 allDataFitLine  = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
 
@@ -339,8 +355,6 @@ set(allDataFitLine, 'Color',            [0.5 0.5 0.5], ...
 
 d = polyfit(log10(directDisp),log10(directPower),1);
 directDataFitLine = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
-
-disp(['slope through direct data set: ',num2str(d(1))])
 
 set(directDataFitLine,  'Color',            'black'     , ...
                         'Linewidth',        3           );
@@ -528,6 +542,7 @@ end
     orientation         = S.orientation;          
     displacement        = S.displacement;
     constraint          = S.constraint;
+    makeLegend          = S.makeLegend;
 
     % create plots:
     
@@ -601,7 +616,7 @@ end
 %             y               = 10.^(d(1)*log10(x)+d(2));
             
         else
-            desiredStruct   = getfield(getfield(parameters, orientation),desiredPlot);
+            desiredStruct   = parameters.(orientation).(desiredPlot);
             
             % decide what plot to do (enable plot-specific attributes)
             if strcmp(desiredPlot,'FFT') || strcmp(desiredPlot,'PLOMB')
@@ -624,32 +639,28 @@ end
                 end
                 
             end
-            
-            plot(x,y,'.-')
-            
-
         end
         
-        scanName = getfield(parameters,'fileName');
-        legendArray{1,iFile} = fileName; 
+        scanName = parameters.fileName;
+        legendArray{1,iFile} = scanName; 
             
         % set color as a function of displacement
         if displacement(iFile) == 0
-            colorForDisp = [0 1 0];
+            colorForDisp = [1 0 0];
         else
-            colorInd = (log10(D(iFile))-logMinD)/(2*(logDelD));
-            colorForDisp = [0.5-colorInd, 0.5-colorInd, 0.5-colorInd];
+            colorInd = 0.7*(log10(displacement(iFile))-logMinD)/((logDelD));
+            colorForDisp = ones(1,3)-colorInd;
         end
         
-        % set unknow displacements to grey
+        % set unknow displacements to green
         if sum(isnan(colorForDisp)) ~= 0
-            colorForDisp = [0.5, 0.5, 0.5];
+            colorForDisp = [0, 1, 0];
         end
         
         p = plot(x,y,'-');
         p.Color = colorForDisp;
         formatSpec = 'D = %d - file: %s';
-        legendArray{1,iFile} = sprintf(formatSpec, D(iFile), ...
+        legendArray{1,iFile} = sprintf(formatSpec, displacement (iFile), ...
             scanName);
         xlabel('Scale (m)')
 
@@ -674,8 +685,9 @@ end
     end
     
     
-    
-    legend(legendArray,'interpreter', 'none')
+    if strcmp(makeLegend,'yes')
+        legend(legendArray,'interpreter', 'none')
+    end
     
     end
 
@@ -715,7 +727,8 @@ userInput     = {'orientation'          ,...    % slip parallel or perprendicula
                  'subset'               ,...    % select a subset of scans 
                  'text'                 ,...    % make tags next to points
                  'histogram'            ,...    % place histogram of roughness measurements next to plot
-                 'errorBound'           ,...    % make erro bounds on plot
+                 'errorBound'           ,...    % make error bounds on plot
+                 'makeLegend'           ,...    % include legend for spectra plot
                  'bootstrap'            };      % run boostrp of the fit   
 numUserInput  = length(userInput);
 
@@ -733,6 +746,7 @@ end
 
 % default input values:
 defaultInput                = [];
+
 defaultInput.orientation    = 'parallel';
 defaultInput.parameter      = 'Power';
 defaultInput.wellProcssed   = repmat({'yes'},1,numFiles);
@@ -742,9 +756,9 @@ defaultInput.fractalSection = 0.03;
 defaultInput.text           = 'off';
 defaultInput.histogram      = 'off';
 defaultInput.errorBound     = 'off';
+defaultInput.makeLegend     = 'no';
 defaultInput.boostrap       = 'off';
-
-defaultInput.displacementError = ones(1,numFiles)*0.2;
+defaultInput.displacementError = ones(1,numFiles); % no great way to do this 
 
 % query info in the parameter structure of the files
 
@@ -756,6 +770,7 @@ S.wellProcessed             = cell(1,numFiles);
 S.magnification             = zeros(1,numFiles);
 S.occular                   = zeros(1,numFiles);
 
+% find information in the inputed directory for each file if it exists
 for iFile = 1:numFiles  
     
     fileName            = files(fileIndex(iFile)).name;
