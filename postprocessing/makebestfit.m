@@ -71,8 +71,8 @@
   
   
   fitObj      = fit(log10(f),log10(p),'poly1','Weights',weightArray);
-  %             C           = fitObj.a;
-  %             BETA        = fitObj.b;
+  %             C           = fitObj.p2;
+  %             BETA        = fitObj.p1;
   %             H           = (BETA+1)/-2;
 
     end

@@ -44,7 +44,7 @@ end
         elseif isa(value,'double')
             S.(name) = value(iFile);
         else
-            error(['Input ',iItem*2, ' must be double or cell array.'])
+            error('Input %f must be double or cell array.',iItem)
         end
         
         updatedS = S;

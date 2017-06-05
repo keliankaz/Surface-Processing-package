@@ -1,11 +1,11 @@
-function newZGrid = align_grid(zGrid, ptSpacing)
+function newZGrid = align_grid(zGrid, ptSpacing, varargin)
 
-rotAngle                = fuckthisshit(zGrid,10000,10);
+rotAngle                = fuckthisshit(zGrid,10000,10,varargin);
 newZGrid                = rotateZ(zGrid,rotAngle,ptSpacing);
 end
 
 
-function [angle] = fuckthisshit(zGrid, downSampleSize, numScale)
+function [angle] = fuckthisshit(zGrid, downSampleSize, numScale, varargin)
 
 % define downsampling factor in reference to the target downsampled grid
 % size.
@@ -13,7 +13,7 @@ function [angle] = fuckthisshit(zGrid, downSampleSize, numScale)
 downSampFactor = ceil(sqrt(numel(zGrid)/downSampleSize));
 
 % downsample 
-if downSampFactor >= 1;
+if downSampFactor >= 1
     downSampGrid = downsample((downsample(zGrid, downSampFactor))', ...
                           downSampFactor)';
 else
@@ -65,7 +65,13 @@ for iAng = 1:maxRotation
  
 end
 
+
+% plot?
+if strcmp(varargin{1},'plot_ang')
 % min the amplitude to the peridogram
 angle = find(roughness == min(roughness))*pi/180;
+plot(1:180, roughness)
+scatter(
+end
 
 end

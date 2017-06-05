@@ -15,6 +15,10 @@ function [FITCOEFF,FITERROR] = runmontecalrofit(N,DATA, ERROR, varargin)
 % ...,histogram, 'on',...        : plot histogram of results 'on' or 'off'
 %                                 (default)
 
+% not ideal here:  remove rows that contain nan
+ind = logical(sum(DATA~=DATA,2));
+DATA(ind,:)     =[];
+ERROR(ind,:)    =[];
 
 dim             = size(DATA);
 numPoints       = max(dim); % number of points in the data set
@@ -74,8 +78,8 @@ for n = 1:N
     
 end
 
-FITCOEFF = mean(fitCoeffs);
-FITERROR = std(fitCoeffs);
+FITCOEFF = mean(fitCoeffs) % the nan here is not ideal
+FITERROR = std(fitCoeffs)  % because it effectively removes the pts with H<1
 
 if strcmp(S.histogram,'on')
     figure

@@ -15,6 +15,8 @@ function [] = unpack_parameters(desiredPlot, varargin)
 %   'PowerVsDisp'   : power at a given scale as a function of displacement
 %   'RMSVsDisp'     : model RMS at a given scale as a function of
 %                     displacement
+%   'DirectRMSVsDisp: direct measurements of RMS as a function of
+%                     displacement.
 %   'Grids'         : shows both the original and pre-processed grid for
 %                     the specified file 'fileName'
 %   'Best Fits'     : best logarythmic fits to power spectra obtained from
@@ -70,7 +72,7 @@ function [] = unpack_parameters(desiredPlot, varargin)
 % the 2.75 occular ('scale' ,0.0001), with sample names displayed next to
 % points for reference ('text', 'on'):
 
-% unpack_parameters('PowerVsDisp','scale' ,0.0001,'subset',{'occular',2.75},'text', 'on')
+% unpack_parameters('roughnessVsDisp','parameter','Power','scale' ,0.0001,'subset',{'occular',2.75},'text', 'on')
 
 %% 2. 
 % To plot all the fast fourier transform ('FFT') spectra in a directory
@@ -80,10 +82,16 @@ function [] = unpack_parameters(desiredPlot, varargin)
 
 % unpack_parameters('FFT','orientation','parallel')
 
-%% roughness at a given scale as a function of displacement
+%% 3.
+% To plot all RMS(L) curves in a directory color coded according to the
+% displacement values specified in their respective -parameter- structure,
+% in the parallel direction ('orientation','parallel'):
 
-if      strcmp(desiredPlot,'PowerVsDisp'        )... 
-     || strcmp(desiredPlot,'RMSVsDisp'          ); roughnessVsDisp(varargin); 
+% unpack_parameters('topostd','orientation','parallel')
+
+%% feed input into correct workflow (functions)
+
+if      strcmp(desiredPlot,'roughnessVsDisp'        ); roughnessVsDisp(varargin); 
 elseif  strcmp(desiredPlot,'Grids'              ); plotgrid(varargin);
 elseif  strcmp(desiredPlot,'hurstVsPrefactor'   ); hurstVsPrefactor(varargin);
 else                                             ; plotspectra(desiredPlot, varargin)
@@ -177,27 +185,31 @@ for iFile = 1:numFiles
         
     if      strcmp(parameter,   'Hurst')      
         Power(iFile)            = -(fitObj.p1+1)/2;
-        powerError(iFile,:)     = -(coefConfInt(:,2)+1)/2;
+        powerError(iFile,:)     = -(coefConfInt(:,1)+1)/2;
         
     elseif  strcmp(parameter,   'prefactor')      
         Power(iFile)            = 10^fitObj.p2;
-        powerError(iFile,:)     = coefConfInt(:,1);
+        powerError(iFile,:)     = coefConfInt(:,2);
         
     elseif  strcmp(parameter,   'Power')          
         Power(iFile)            = 10.^fitObj(log10(1/scale));
         powerError(iFile,:)     = 10.^predint(fitObj,log10(1/scale),0.68);
         
-    elseif  strcmp(parameter,   'RMS')
+    elseif  strcmp(parameter,   'RMS_emily')
         % Handle the conversion to RMS as done in Brodsky et al., 2011
         % P(lambda) = C*lambda^BETA
-        BETA = fitObj.p1;
-        RMS                     = (10^fitObj.p2/(BETA - 1))^0.5*scale*(BETA-1)/2;
-        Power(iFile)            = RMS; %... for the purpose of plotting...
+        BETA = -fitObj.p1;          
         
-        BETAconfInt             = coefConfInt(:,1);
-        powerError              = (coefConfInt(:,2)./(BETAconfInt-1)).^0.5 ...
-                                  .*scale .*(BETAconfInt-1)/2;
+        RMS                     = sqrt(10^fitObj.p2/(BETA - 1))*scale.^((BETA-1)/2);
+        Power(iFile)            = RMS; %... for the purpose of plotting...
+        powerError(iFile,:)     = (coefConfInt(:,2)./(BETAconfInt-1)).^0.5 ...
+                                  .*scale .*(BETAconfInt-1)/2; 
                               
+    elseif strcmp(parameter,    'RMS_internet_stylez_with_a_Z')
+        up2Scale                = fx>1/scale;
+        
+        Power(iFile)            = sqrt(trapz(fx(up2Scale),Px(up2Scale)));
+        powerError(iFile,:)    	= [Power(iFile)-10^-20,Power(iFile)+10^-20];
     end
     
    
@@ -233,6 +245,7 @@ directDisp          = allDisp          (directInd);
 directDispError     = allDispError     (directInd); 
 
 doMonteCarlo = 'on';
+
 if strcmp(doMonteCarlo,'on')
     
     %% fit through all data
@@ -284,10 +297,15 @@ if strcmp(doMonteCarlo,'on')
     [directDataFit,directDataFitError] = runmontecalrofit(1000,DATA,ERROR   , ...
                                     'errorModel',      errorModel           , ...
                                     'histogram',       'off'                );
+                                
+                                
                                       
 end
 
-figure
+if strcmp(S.ptest, 'on')
+    p = calcSignificance(DATA,directDataFit);
+    fprintf('We report a %f condidence of thefit through the directly fit data \n', p)
+end
 
 if strcmp(S.histogram, 'on')
     subplot(1,2,1)
@@ -330,7 +348,10 @@ set(directData,     'LineStyle',        'none'      , ...
                 
 % Zero displacement Data ploted as lines
 for iLine = 1:length(zeroDispPower)
-    zeroDisplacement = plot(minmaxD, zeroDispPower(iLine)*[1,1], 'r','Linewidth',2);
+    zeroDisplacement = plot(minmaxD, zeroDispPower(iLine)*[1,1]);
+    set(zeroDisplacement,   'Color',            [0.5 0.5 0.5], ...
+                            'LineWidth',        2            , ...
+                            'LineStyle',        '--'         );
 end
    
     % pass a best fit line through the entire dataset
@@ -341,7 +362,7 @@ end
 
 allDataFitLine  = plot(minmaxD,10.^(d(1)*log10(minmaxD)+d(2)));
 
-set(allDataFitLine, 'Color',            [0.5 0.5 0.5], ...
+set(allDataFitLine, 'Color',            [1 0 0]      , ...
                     'LineWidth',        2            , ...
                     'LineStyle',        '--'         );         
          
@@ -468,12 +489,11 @@ for iFile = 1:numFiles
     
     % get the fit
     fitObj              = makebestfit(fx,Px,'FitMethod','section','SectionVal',S.fractalSection);
+    hurst(iFile)        = (fitObj.p1+1)/-2;
+    prefactor(iFile)    = fitObj.p2;
     
-    hurst(iFile)        = (fitObj.b+1)/-2;
-    prefactor(iFile)    = fitObj.a;
-    
-    plot(fitObj,fx,Px)
-    
+    %plot(fitObj,fx,Px)
+    %hold on
     
 end
 
@@ -497,7 +517,25 @@ hold off
 ax = gca;
 set(ax,'XScale', 'log', 'YScale', 'log')
 
-end
+% show statistics of hurst and prefactor
+
+dispStats('hurst',hurst)
+dispStats('prefactor',prefactor)
+
+% where
+
+        function dispStats(name, values)
+            meanVal       = mean(values);
+            rangeVal      = minmax(values);
+            formatSpec     = 'The range in values for %s is %f to %f, with a mean value of %f';
+            str             = sprintf(formatSpec, name, rangeVal(1), rangeVal(2), meanVal);
+            disp(str)
+        end
+  
+figure
+histogram(hurst)
+    
+    end
 
 %% plot a specific, or many, grids (surfaces)
     function [] = plotgrid(inputs)
@@ -680,7 +718,12 @@ end
         if strcmp(desiredPlot,'topostd') || strcmp(desiredPlot,'FFT')|| ...
                 strcmp(desiredPlot,'PLOMB')
             set(gca,'XScale','log','YScale','log')
-            xlabel('Scale (log(m))')
+            if strcmp(desiredPlot,'FFT')
+                ylabel('Power (m^3)')
+                xlabel('Wave length, \lambda (m)')
+            else
+                xlabel('Scale (log(m))')
+            end
         end
     end
     
@@ -729,7 +772,8 @@ userInput     = {'orientation'          ,...    % slip parallel or perprendicula
                  'histogram'            ,...    % place histogram of roughness measurements next to plot
                  'errorBound'           ,...    % make error bounds on plot
                  'makeLegend'           ,...    % include legend for spectra plot
-                 'bootstrap'            };      % run boostrp of the fit   
+                 'bootstrap'            ,...    % run boostrp of the fit
+                 'ptest'                };      % evaluate comfidence on fit         
 numUserInput  = length(userInput);
 
 numInputs = length(inputs);
@@ -759,6 +803,7 @@ defaultInput.errorBound     = 'off';
 defaultInput.makeLegend     = 'no';
 defaultInput.boostrap       = 'off';
 defaultInput.displacementError = ones(1,numFiles); % no great way to do this 
+defaultInput.ptest          = 'off';
 
 % query info in the parameter structure of the files
 
@@ -785,6 +830,10 @@ for iFile = 1:numFiles
                 parameters.(f);   
             elseif isa(parameters.(f), 'double')
                 S.(f)(1,iFile)   = ...
+                parameters.(f); 
+            elseif isa(parameters.(f), 'string')
+                f = char(f);
+                S.(f){1,iFile}   = ...
                 parameters.(f); 
             else
                 error('unrecognized variable type, must be cell or double')

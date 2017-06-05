@@ -17,9 +17,9 @@ figure
 % set the location of the plot that will be displayed in figure window,
 % location is normalized to 1
 
-ax1 = axes( 'Position',         [0.1  0.1 0.35 0.8 ]);
-ax2 = axes('Position',          [0.35 0.7 0.1  0.15]);
-ax3 = axes('Position',          [0.55 0.1 0.35 0.8 ]);
+ax1 = axes( 'Position',         [0.1  0.2 0.35 0.7 ]);
+ax2 = axes('Position',          [0.35 0.8 0.1  0.15]);
+ax3 = axes('Position',          [0.55 0.2 0.35 0.7 ]);
 
 faultSurf       = surf(ax1,xGrid,yGrid,zGrid);
 faultSurfLight  = light;
