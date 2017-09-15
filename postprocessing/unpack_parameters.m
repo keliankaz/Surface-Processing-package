@@ -1,11 +1,11 @@
-function [] = unpack_parameters(desiredPlot, varargin)
+function [] = unpack_parameters(desiredData, varargin)
 % unpacks the output from the surface processing code package.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % INPUT:
 
-% desiredPlot:
+% desiredData:
 %   'FFT'           : power spectrum as determined by the fast fourier analysis
 %   'PLOMB'         : periodogram as determined by the plomb analysis
 %   'avgAsyms'      : scale dependent average asymetry
@@ -23,6 +23,7 @@ function [] = unpack_parameters(desiredPlot, varargin)
 %                     FFT
 %   'hurstVsPrefactor': correlation between best fit hurst exponent and
 %                     prefactor
+%   
 
 % varargin:
 %   orientation:
@@ -89,12 +90,31 @@ function [] = unpack_parameters(desiredPlot, varargin)
 
 % unpack_parameters('topostd','orientation','parallel')
 
+%% 4.
+% Print a list of a given parameter (Husrt exponent, prefactor, power or
+% RMS at a given scale simply:
+
+% unpack_parameters('Hurst')
+% unpack_parameters('Power','scale', 0.25)
+% unpack_paramaters('RMS_internet_stylez_with_a_Z', 'scale', 0.0002) % compute RMS by integrating under the FFT sprectrum
+
 %% feed input into correct workflow (functions)
 
-if      strcmp(desiredPlot,'roughnessVsDisp'        ); roughnessVsDisp(varargin); 
-elseif  strcmp(desiredPlot,'Grids'              ); plotgrid(varargin);
-elseif  strcmp(desiredPlot,'hurstVsPrefactor'   ); hurstVsPrefactor(varargin);
-else                                             ; plotspectra(desiredPlot, varargin)
+if ~strcmp(desiredData,'Grids')
+    [files, numFiles,fileIndex] = getfiles();
+    [S,subsetLoc,numFiles]= parseInput(varargin,files,numFiles,fileIndex); 
+end
+
+if          strcmp(desiredData, 'roughnessVsDisp'    ); roughnessVsDisp         (S,files, fileIndex, subsetLoc,numFiles); 
+elseif      strcmp(desiredData, 'Grids'              ); plotgrid(varargin);
+elseif      strcmp(desiredData, 'hurstVsPrefactor'   ); hurstVsPrefactor        (S,files, fileIndex, subsetLoc,numFiles);
+elseif  any(strcmp(desiredData,{'Hurst'     , ...
+                                'prefactor' , ...
+                                'Power'     , ...
+                                'RMS_emily' , ...
+                                'RMS_internet_stylez_with_a_Z' ...
+                                                   })); get_suface_parameter    (desiredData, S, files, fileIndex ,subsetLoc,numFiles,'yes');     
+else                                                  ; plotspectra(desiredData, S, files, fileIndex ,subsetLoc,numFiles);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% save plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,21 +125,24 @@ end
 
 end
 
+%% Main function
 %% plot a metric of roughness vs displacement
-    function [] = roughnessVsDisp(inputs)
-
-% create a working structure with user info and default settings
-[files, numFiles,fileIndex] = getfiles();
-[S,subsetLoc,numFiles]= parseInput(inputs,files,numFiles,fileIndex); 
-
-% extract all the info from the strucutre now that it is set
-orientation         = S.orientation;   
+    function [] = roughnessVsDisp(S, files, fileIndex, subsetLoc,numFiles)
+    
+% extract all the info from the strucutre now that it is set 
 parameter           = S.parameter;     
 scale               = S.scale;   
 displacement        = S.displacement;
 constraint          = S.constraint;
 wellProcessed       = S.wellProcessed;
 displacementError   = S.displacementError;
+
+% chack if displacement is defined for any of the scans, in none are
+% defined, this function makes no sense
+
+if isempty(displacement)
+    error('Error using roughnessVsDis, displacement values must be specified on at least one of the scans');
+end
 
 % create plots:
 
@@ -129,91 +152,7 @@ minD        = min(displacement(displacement~=0));
 maxD        = max(displacement);
 minmaxD     = [minD,maxD];
 
-Power       = zeros(1,numFiles);
-powerError  = zeros(numFiles,2);
-fileNameArray = cell(1,numFiles);
-
-for iFile = 1:numFiles
-    % run over the subset of files (default is all of them)
-    
-    % get the file and load it
-    fileName            = files(fileIndex(subsetLoc(iFile))).name;
-    load(fileName,'parameters')
-    fileNameArray{1,iFile} = parameters.fileName;
-    
-    % get the roughness data
-    spectrumType        = 'FFT';
-    desiredData         = parameters.(orientation).(spectrumType);
-    
-    fx                  = desiredData{1,1};
-    Px                  = desiredData{1,2};
-    
-    numFx               = length(fx);
-    Px                  = Px(1:numFx);
-    
-    PxNanInd            = isnan(Px);
-    fx                  = fx(~PxNanInd);
-    Px                  = Px(~PxNanInd);
-    
-    % create error bounds or continue with default
-    if     strcmp(S.errorBound,'on')
-        
-        errUp               = desiredData{1,3};
-        errDown             = desiredData{1,4};
-        
-        errorBounds         = [errUp, errDown];
-        errorBounds         = errorBounds(1:numFx,:);
-        errorBounds         = errorBounds(~PxNanInd,:);
-        
-    elseif strcmp(S.errorBound,'off')
-        errorBounds         = 'off';
-    else
-        error('error bound must indicate "off" or "on"')
-    end
-    
-    % fit the data
-    fitObj                  = makebestfit(fx,Px,'FitMethod',    'section'       , ...
-                                                'SectionVal',   S.fractalSection, ...
-                                                'error',        errorBounds);
-    coefConfInt             = confint(fitObj,0.68);
-    coefConfInt(:,2)        = 10.^coefConfInt(:,2);
-    
-    % this is a bit awkward but fuckit im tired (we basically continue
-    % with the same code but instead of using the power we just use the
-    % parameter specified by the input exponent (the slope of the best
-    % fit line through the data).
-        
-    if      strcmp(parameter,   'Hurst')      
-        Power(iFile)            = -(fitObj.p1+1)/2;
-        powerError(iFile,:)     = -(coefConfInt(:,1)+1)/2;
-        
-    elseif  strcmp(parameter,   'prefactor')      
-        Power(iFile)            = 10^fitObj.p2;
-        powerError(iFile,:)     = coefConfInt(:,2);
-        
-    elseif  strcmp(parameter,   'Power')          
-        Power(iFile)            = 10.^fitObj(log10(1/scale));
-        powerError(iFile,:)     = 10.^predint(fitObj,log10(1/scale),0.68);
-        
-    elseif  strcmp(parameter,   'RMS_emily')
-        % Handle the conversion to RMS as done in Brodsky et al., 2011
-        % P(lambda) = C*lambda^BETA
-        BETA = -fitObj.p1;          
-        
-        RMS                     = sqrt(10^fitObj.p2/(BETA - 1))*scale.^((BETA-1)/2);
-        Power(iFile)            = RMS; %... for the purpose of plotting...
-        powerError(iFile,:)     = (coefConfInt(:,2)./(BETAconfInt-1)).^0.5 ...
-                                  .*scale .*(BETAconfInt-1)/2; 
-                              
-    elseif strcmp(parameter,    'RMS_internet_stylez_with_a_Z')
-        up2Scale                = fx>1/scale;
-        
-        Power(iFile)            = sqrt(trapz(fx(up2Scale),Px(up2Scale)));
-        powerError(iFile,:)    	= [Power(iFile)-10^-20,Power(iFile)+10^-20];
-    end
-    
-   
-end
+[fileNameArray, Power, powerError] = get_suface_parameter(parameter, S, files, fileIndex, subsetLoc,numFiles,'no');
 
 % clean out data
 nanInd    = isnan(displacement);
@@ -224,7 +163,7 @@ if size(displacement) ~= size(Power); Power = Power'; end
 
 % classify data
 
-allConstraint   = constraint        (~zeroInd & ~nanInd)';
+allConstraint   = string(constraint        (~zeroInd & ~nanInd)');
 allDisp         = displacement      (~zeroInd & ~nanInd);
 allDispError    = displacementError (~zeroInd & ~nanInd);
 allPower        = Power             (~zeroInd & ~nanInd);
@@ -240,11 +179,11 @@ upperBoundDispError = allDispError     (upperBoundInd);
 
 directInd           = strcmp(allConstraint,'Direct');
 directPower         = allPower         (directInd);
-directPowerErr      = allPowerError    (directInd, : );
+directPowerErr      = allPowerError    (directInd, :);
 directDisp          = allDisp          (directInd); 
 directDispError     = allDispError     (directInd); 
 
-doMonteCarlo = 'on';
+doMonteCarlo = 'off';
 
 if strcmp(doMonteCarlo,'on')
     
@@ -298,7 +237,15 @@ if strcmp(doMonteCarlo,'on')
                                     'errorModel',      errorModel           , ...
                                     'histogram',       'off'                );
                                 
-                                
+    hold on
+
+    monteCarloAllDataFit    = plot(minmaxD, ...
+                               10.^(allDataFit(1)*log10(minmaxD)+allDataFit(2))); 
+
+                           
+    monteCarloDirectDataFit = plot(minmaxD, ...
+                               10.^(directDataFit(1)*log10(minmaxD)+directDataFit(2)));
+                            
                                       
 end
 
@@ -311,14 +258,6 @@ if strcmp(S.histogram, 'on')
     subplot(1,2,1)
 end
 
-hold on
-
-monteCarloAllDataFit    = plot(minmaxD, ...
-                               10.^(allDataFit(1)*log10(minmaxD)+allDataFit(2))); 
-
-                           
-monteCarloDirectDataFit = plot(minmaxD, ...
-                               10.^(directDataFit(1)*log10(minmaxD)+directDataFit(2)));
 
 upperBoundData          = errorbar(upperBoundDisp,  upperBoundPower     , ...
                                   -upperBoundPowerErr(:,1) + upperBoundPower' , ...
@@ -384,18 +323,18 @@ set(directDataFitLine,  'Color',            'black'     , ...
 
 hXLabel = xlabel('Displacement (m)');
 hYLabel = ylabel(parameter);
-hTitle  = title([parameter, ' as a function of displacement at ',num2str(scale),'m using ', spectrumType,' - ' date]);
+hTitle  = title([parameter, ' as a function of displacement at ',num2str(scale),'m using FFT',' - ' date]);
 
-hLegend = legend([upperBoundData   , directData, zeroDisplacement   , ...
-                   allDataFitLine, directDataFitLine]               , ...
-                   'Upper bound displacement constraint'            , ...
-                   'Direct displacement constraint'                 , ...
-                   'Zero displacement bound'                        , ...
-                   sprintf('Fit through all data: \\it{P(d) = %0.2g d^{%0.2g \\pm %0.1g}}', ...
-                            10^allDataFit(2), allDataFit(1), allDataFitError(2)),  ...
-                   sprintf('Fit through data with direct displacement constraint: \\it{P(d) = %0.2g d^{%0.2g \\pm %0.1g}}', ...
-                             10^directDataFit(2), directDataFit(1), directDataFitError(2)),  ...
-                   'location','SouthWest'                           );
+% hLegend = legend([upperBoundData   , directData, zeroDisplacement   , ...
+%                    allDataFitLine, directDataFitLine]               , ...
+%                    'Upper bound displacement constraint'            , ...
+%                    'Direct displacement constraint'                 , ...
+%                    'Zero displacement bound'                        , ...
+%                    sprintf('Fit through all data: \\it{P(d) = %0.2g d^{%0.2g \\pm %0.1g}}', ...
+%                             10^allDataFit(2), allDataFit(1), allDataFitError(2)),  ...
+%                    sprintf('Fit through data with direct displacement constraint: \\it{P(d) = %0.2g d^{%0.2g \\pm %0.1g}}', ...
+%                              10^directDataFit(2), directDataFit(1), directDataFitError(2)),  ...
+%                    'location','SouthWest'                           );
                
 
 
@@ -404,8 +343,8 @@ set( gca                       , ...
     'FontName'   , 'Helvetica' );
 set([hTitle, hXLabel, hYLabel], ...
     'FontName'   , 'AvantGarde');
-set([hLegend, gca]             , ...
-    'FontSize'   , 8           );
+% set([hLegend, gca]             , ...
+%     'FontSize'   , 8           );
 set([hXLabel, hYLabel]  , ...
     'FontSize'   , 10          );
 set( hTitle                    , ...
@@ -448,14 +387,10 @@ end
 end
 
 %% plot Hurst Exponent as a function of Prefactor
-    function [] = hurstVsPrefactor(inputs)
+    function [] = hurstVsPrefactor(S,files, fileIndex, subsetLoc,numFiles)
     % plots the hurst exponent as a function of theprefacto with the
     % specific intention to extract correlation between these two...
     
-% create a working structure with user info and default settings
-[files, numFiles,fileIndex] = getfiles();    
-[S,subsetLoc,numFiles]   = parseInput(inputs,files,numFiles,fileIndex);
-
 orientation = S.orientation;
 
 % added functonality commented out for the moemen (not completed)
@@ -571,11 +506,9 @@ histogram(hurst)
     end
 
 %% plot all the frequency spectra in a given directory
-    function [] = plotspectra(desiredPlot,inputs)
+    function [] = plotspectra(desiredPlot,S,files, fileIndex, subsetLoc,numFiles)
         
-    [files, numFiles,fileIndex] = getfiles();
-    [S,subsetLoc,numFiles]= parseInput(inputs,files,numFiles,fileIndex); 
-
+   
     % extract all the info from the strucutre now that it is set
     orientation         = S.orientation;          
     displacement        = S.displacement;
@@ -604,7 +537,7 @@ histogram(hurst)
         if strcmp(desiredPlot,'best fits')
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
+            disp('hi')
             spectrumType        = 'FFT';
             desiredData         = parameters.(orientation).(spectrumType);
             fx                  = desiredData{1,1};
@@ -637,7 +570,7 @@ histogram(hurst)
             end
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            
+%             
 %             desiredStruct   = getfield(getfield(parameters, orientation),'FFT');
 %             desiredCell     = desiredStruct;
 %             
@@ -701,7 +634,8 @@ histogram(hurst)
         legendArray{1,iFile} = sprintf(formatSpec, displacement (iFile), ...
             scanName);
         xlabel('Scale (m)')
-
+        
+        
         
         % to help distinguish points whith various constraints on displacement
         if strcmp(constraint{iFile}, 'Direct')
@@ -720,7 +654,7 @@ histogram(hurst)
             set(gca,'XScale','log','YScale','log')
             if strcmp(desiredPlot,'FFT')
                 ylabel('Power (m^3)')
-                xlabel('Wave length, \lambda (m)')
+                xlabel('Wave length, \lambda (m)')                
             else
                 xlabel('Scale (log(m))')
             end
@@ -734,6 +668,114 @@ histogram(hurst)
     
     end
 
+%% Sub functions
+    function [fileNameArray, parameterValueArray, parameterErrorArray] = get_suface_parameter(parameterName, S, files, fileIndex, subsetLoc,numFiles, showOutputYN)
+    % function that get a specfic parameter (string: parameterName - one of
+    % 'Hurst','prefactor', 'Power','RMS_emily',
+    % 'RMS_internet_stylez_with_a_Z'), for a given fileName. Th user also
+    % specifies the orientation and type of spectrum (likely 'FFT' that
+    % will queried). Note that parameters 'Power','RMS_emily',
+    % 'RMS_internet_stylez_with_a_Z' require user to specify a scale of
+    % observation
+    
+    % usage (14-sep-2017):
+    % [fileNameArray, Power, powerError] =  get_suface_parameter(fileName,'parallel','FFT','Power'
+    
+    % author: Kelian Dascher-Cousineau
+    % McGill Universityreporting to James Kirkpatric
+    
+    
+    orientation         = S.orientation;
+    scale               = S.scale;
+      
+    % init arrrays
+    parameterValueArray         = zeros(1,numFiles);
+    parameterErrorArray         = zeros(numFiles,2);
+    fileNameArray               = cell(1,numFiles);
+    
+    for iFile = 1:numFiles
+        
+        fileName            = files(fileIndex(subsetLoc(iFile))).name;
+        load(fileName,'parameters')
+        
+        fileNameArray{iFile}= parameters.fileName;
+        
+        % get the roughness data
+        spectrumType = 'FFT';
+        desiredData         = parameters.(orientation).(spectrumType);
+        
+        fx                  = desiredData{1,1};
+        Px                  = desiredData{1,2};
+        
+        numFx               = length(fx);
+        Px                  = Px(1:numFx);
+        
+        PxNanInd            = isnan(Px);
+        fx                  = fx(~PxNanInd);
+        Px                  = Px(~PxNanInd);
+        
+        % create error bounds or continue with default
+        if     strcmp(S.errorBound,'on')
+            errUp               = desiredData{1,3};
+            errDown             = desiredData{1,4};
+            errorBounds         = [errUp, errDown];
+            errorBounds         = errorBounds(1:numFx,:);
+            errorBounds         = errorBounds(~PxNanInd,:);
+        elseif strcmp(S.errorBound,'off')
+            errorBounds         = 'off';
+        else
+            error('error bound must indicate "off" or "on"')
+        end
+        
+        % fit the data
+        fitObj                  = makebestfit(fx,Px,'FitMethod',    'section'       , ...
+            'SectionVal',   S.fractalSection, ...
+            'error',        errorBounds);
+        coefConfInt             = confint(fitObj,0.68);
+        coefConfInt(:,2)        = 10.^coefConfInt(:,2);
+        
+        % this is a bit awkward but fuckit im tired (we basically continue
+        % with the same code but instead of using the power we just use the
+        % parameter specified by the input exponent (the slope of the best
+        % fit line through the data).
+        
+        if      strcmp(parameterName,   'Hurst')
+            parameterValueArray(iFile)       	= -(fitObj.p1+1)/2;
+            parameterErrorArray(iFile,:)      	= -(coefConfInt(:,1)+1)/2;
+            
+        elseif  strcmp(parameterName,   'prefactor')
+            parameterValueArray(iFile)       	= 10^fitObj.p2;
+            parameterErrorArray(iFile,:)      	= coefConfInt(:,2);
+            
+        elseif  strcmp(parameterName,   'Power')
+            parameterValueArray(iFile)        	= 10.^fitObj(log10(1/scale));
+            parameterErrorArray(iFile,:)    	= 10.^predint(fitObj,log10(1/scale),0.68);
+            
+        elseif  strcmp(parameterName,   'RMS_emily')
+            % Handle the conversion to RMS as done in Brodsky et al., 2011
+            % P(lambda) = C*lambda^BETA
+            BETA = -fitObj.p1;
+            RMS                     = sqrt(10^fitObj.p2/(BETA - 1))*scale.^((BETA-1)/2);
+            parameterValueArray(iFile)          = RMS; %... for the purpose of plotting...
+            parameterErrorArray(iFile,:)     	= (coefConfInt(:,2)./(BETAconfInt-1)).^0.5 ...
+                .*scale .*(BETAconfInt-1)/2;
+            
+        elseif strcmp(parameterName,    'RMS_internet_stylez_with_a_Z')
+            up2Scale                = fx>1/scale;
+            parameterValueArray(iFile)       	= sqrt(trapz(fx(up2Scale),Px(up2Scale)));
+            parameterErrorArray(iFile,:)     	= [parameterValueArray(iFile)-10^-20,parameterValueArray(iFile)+10^-20];
+        end % if/elseif
+    end % for 
+    
+    if strcmp(showOutputYN, 'yes')
+        
+        disp([fileNameArray',num2cell(parameterValueArray')])
+    elseif ~strcmp(showOutputYN,'no')
+        error('Error in function get_suface_parameter input showOutputYN must be ''yes'' or ''no''')
+    end
+    
+    end % function
+  
 %% small function to query the files in the desired directory
     function [files, numFiles, fileIndex] = getfiles()
     
@@ -747,7 +789,6 @@ histogram(hurst)
                          ~ strcmp({files.name},'.DS_Store'));
         numFiles  = length(fileIndex);
     end
-
     
 %% input parsing functions (if you want to add input options here is the place)
     function [S, SUBSETLOC, NUMFILES] = parseInput(inputs, files, numFiles, fileIndex)
@@ -865,7 +906,7 @@ for iScanInfo = 1:numScanInfo
     S.(scanInputInfo{1,iScanInfo}) = S.(scanInputInfo{1,iScanInfo})(1,SUBSETLOC);
 end
    
-    end
+end
 
 
     

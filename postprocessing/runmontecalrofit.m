@@ -73,13 +73,14 @@ for n = 1:N
         numInd          = length(loc);
         newDATA(loc)    = DATA(loc) + (2*rand(numInd,1)-1).*ERROR(loc);
     end
+    
     d               = polyfit(log10(newDATA(:,1)),log10(newDATA(:,2)),1);
     fitCoeffs(n,:)  = d;
     
 end
 
-FITCOEFF = mean(fitCoeffs) % the nan here is not ideal
-FITERROR = std(fitCoeffs)  % because it effectively removes the pts with H<1
+FITCOEFF = nanmean(fitCoeffs); % the nan here is not ideal
+FITERROR = nanstd(fitCoeffs);  % because it effectively removes the pts with H<1
 
 if strcmp(S.histogram,'on')
     figure
